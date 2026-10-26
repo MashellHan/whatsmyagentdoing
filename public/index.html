@@ -214,13 +214,15 @@
   body.pip section:first-child { margin-top: 0; }
   body.pip .grid { grid-template-columns: 1fr; }
 </style>
+<link rel="stylesheet" href="/team-office.css">
 </head>
 <body>
 <div class="wrap">
+  <div class="team-nav" id="teamNav"><a id="back" href="/">← 返回小镇</a><span id="teamScope">原版办公室 · 全部会话</span><span class="private-note">▣ 隐私 · 仅本机 · 日志优先</span></div>
   <header>
+    <span id="pipTeam" class="pip-team" hidden></span>
     <h1>👀 <span data-t="title"></span></h1>
     <div class="summary" id="summary"></div>
-    <button class="newver" id="newVer" hidden></button>
     <div class="controls">
       <div class="seg" id="viewSeg">
         <button data-v="office" data-t="office"></button>
@@ -264,6 +266,10 @@
       </details>
     </div>
   </header>
+  <p id="statusPolicy" class="status-policy" hidden>状态与动作使用原版日志推断及超时规则；无精确日志关联时才回退 Herdr，并逐人标明。</p>
+  <p id="teamSourceWarning" class="team-source-warning" role="status" hidden></p>
+  <div class="workspace-content">
+  <div class="workplace-main">
   <p class="pip-error" id="pipError" role="alert" hidden></p>
   <div class="pip-preview" id="pipPreview" hidden>
     <p data-t="pipVideoHint"></p>
@@ -277,6 +283,9 @@
     <div class="legend" id="agentLegend"></div>
   </div>
   <main id="main"></main>
+  </div>
+  <aside id="teamRoster" class="team-roster" aria-label="屋内成员" hidden><div class="roster-heading"><h2>屋内成员</h2><span id="memberCount"></span></div><p id="leaderNote"></p><div id="members"></div></aside>
+  </div>
 </div>
 <div class="conn" id="conn" data-t="disconnected"></div>
 <div class="tip" id="tip"></div>
@@ -316,14 +325,17 @@ function applyLang(code) {
   if (typeof renderVersion === 'function') renderVersion();
 }
 
+const TEAM = new URLSearchParams(location.search).get('team') || null;
+const PREF_PREFIX = TEAM ? `wmad.team.${encodeURIComponent(TEAM)}.` : 'wmad.';
+if (TEAM) document.body.classList.add('team-office');
 const store = (() => {
   const fallback = new Map();
-  const get = (k, d) => { try { const v = localStorage.getItem('wmad.' + k); return v == null ? d : JSON.parse(v); } catch { return fallback.has(k) ? fallback.get(k) : d; } };
-  const set = (k, v) => { fallback.set(k, v); try { localStorage.setItem('wmad.' + k, JSON.stringify(v)); } catch {} };
+  const get = (k, d) => { try { const v = localStorage.getItem(PREF_PREFIX + k); return v == null ? d : JSON.parse(v); } catch { return fallback.has(k) ? fallback.get(k) : d; } };
+  const set = (k, v) => { fallback.set(k, v); try { localStorage.setItem(PREF_PREFIX + k, JSON.stringify(v)); } catch {} };
   return { get, set };
 })();
 
-const PREF_DEFAULTS = { view: 'office', quality: 'mid', scene: 'office', agent: 'all', showSub: false, showIdle: false, showAgent: true, lang: 'auto' };
+const PREF_DEFAULTS = { view: 'office', quality: 'mid', scene: 'office', agent: 'all', showSub: false, showIdle: !!TEAM, showAgent: true, lang: 'auto' };
 function validPreference(k, v) {
   if (!Object.hasOwn(PREF_DEFAULTS, k)) return false;
   if (typeof PREF_DEFAULTS[k] === 'boolean') return typeof v === 'boolean';
@@ -351,7 +363,10 @@ if (PIP) document.body.classList.add('pip');
     } catch { /* malformed preferences use the saved defaults */ }
   }
   for (const k of ['view', 'quality', 'scene', 'lang']) if (validPreference(k, q.get(k))) store.set(k, q.get(k));
-  if (location.search) history.replaceState(null, '', location.pathname + (PIP ? '?pip=1' : ''));
+  const keep = new URLSearchParams();
+  if (TEAM) keep.set('team', TEAM);
+  if (PIP) keep.set('pip', '1');
+  if (location.search) history.replaceState(null, '', location.pathname + (keep.size ? '?' + keep : ''));
 }
 
 const state = {
@@ -405,6 +420,7 @@ function timeLabel(s, now) {
 // is expanded, so a folder or session name can't run anything when pasted.
 const shq = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`;
 function resumeCmd(s) {
+  if (s.capabilities?.resume === false || s.source === 'herdr') return '';
   const cd = s.cwd ? `cd ${shq(s.cwd)} && ` : '';
   if (s.agent === 'claude') return `${cd}claude --resume ${shq(s.id)}`;
   if (s.agent === 'gemini') return `${cd}gemini --resume ${shq(s.sessionId || s.id)}`;
@@ -416,8 +432,42 @@ function agentLogo(agent) {
   return badge ? `<img class="agent-logo" src="${badge.logo}" alt="" aria-hidden="true">` : '';
 }
 
+function statusSource(s) {
+  return s.statusSource || (s.source === 'herdr' ? 'herdr' : 'log');
+}
+function sourceBadge(s) {
+  const fallback = statusSource(s) === 'herdr';
+  return `<span class="source-badge" data-source="${fallback ? 'herdr' : 'log'}" title="${fallback ? '未找到唯一的 provider + session ID 日志，回退 Herdr 状态' : '原版会话日志推断，包含原版静默超时规则'}">${fallback ? 'Herdr 回退 · ' + esc(s.herdrStatus || s.sourceStatus || 'unknown') : '会话日志'}</span>`;
+}
+function renderTeam() {
+  if (!TEAM) return;
+  const team = state.data.teams?.find(t => t.id === TEAM);
+  const name = team?.name || TEAM;
+  document.getElementById('pipTeam').hidden = !PIP;
+  document.getElementById('pipTeam').textContent = `${name} · ${TEAM}`;
+  document.querySelector('h1').textContent = name;
+  document.getElementById('teamScope').textContent = `${TEAM} / TEAM HOUSE`;
+  document.title = `${name} · ${state.view === 'office' ? L.office : L.list}`;
+  document.getElementById('statusPolicy').hidden = PIP;
+  document.getElementById('teamRoster').hidden = PIP;
+  const warning = document.getElementById('teamSourceWarning');
+  warning.hidden = state.data.source?.presence !== 'stale';
+  warning.textContent = 'Herdr 身份快照已过期，保留上次团队关系；日志状态继续独立更新。';
+  const members = state.data.sessions.slice().sort((a, b) => (b.role === 'leader') - (a.role === 'leader') || String(a.paneId || a.key).localeCompare(String(b.paneId || b.key), undefined, { numeric: true }));
+  document.getElementById('memberCount').textContent = `${members.length}`;
+  document.getElementById('leaderNote').textContent = members.some(s => s.role === 'leader')
+    ? '★ Leader 保留主位；空闲不显示工作动作。' : 'Leader 未显式配置，不推断成员角色。';
+  const content = members.map(s => `<div class="team-member" data-testid="member" data-pane-id="${esc(s.paneId || s.key)}" data-key="${esc(s.key)}" data-status="${esc(s.status)}" data-agent="${esc(s.agent)}" data-role="${esc(s.role)}" data-source="${statusSource(s)}">
+    <div class="member-identity"><span class="agent ${esc(s.agent)}">${agentLogo(s.agent)}</span><span class="member-name">${esc(s.displayName || s.project || s.id)}</span>${s.role === 'leader' ? '<span class="role-label">★ leader</span>' : ''}</div>
+    <div class="member-meta">${esc(AGENT_NAME[s.agent] || s.agent)} · ${esc(s.paneId || '未分组日志')}</div>
+    <div class="member-state" data-s="${esc(s.status)}"><span class="dot"></span><span>${esc(L[s.status] || s.status)}</span><code>${esc(s.status)}</code></div>
+    <div class="member-sources">${sourceBadge(s)}${s.presence === 'stale' ? '<span class="stale-chip">身份 stale</span>' : ''}</div>
+  </div>`).join('') || '<p class="roster-empty">房子还在，暂时没有成员。</p>';
+  if (document.getElementById('members').innerHTML !== content) document.getElementById('members').innerHTML = content;
+}
+
 function card(s, now) {
-  const project = s.project || (s.cwd ? s.cwd : '—');
+  const project = s.displayName || s.paneId || s.project || (s.cwd ? s.cwd : '—');
   const title = s.title && s.title !== project ? `<div class="title" title="${esc(s.title)}">${esc(s.title)}</div>` : '';
   const act = s.activity ? `<span class="act" title="${esc(s.activity)}">${esc(s.activity)}</span>` : '';
   const showText = !s.subagent || ACTIVE.has(s.status);
@@ -433,9 +483,10 @@ function card(s, now) {
       <span class="time" data-time="${esc(s.key)}">${esc(timeLabel(s, now))}</span>
     </div>
     ${title}
+    <div class="session-source">${sourceBadge(s)}${s.paneId ? `<span>${esc(s.paneId)}</span>` : ''}${s.role === 'leader' ? '<span>★ leader</span>' : ''}</div>
     <div class="status"><span class="ind"><i></i><i></i><i></i></span><span class="lbl">${esc(L[s.status] || s.status)}</span>${act}</div>
     ${err}${q}${r}
-    <div class="foot"><span class="model">${esc((s.model || '') + sub)}</span><button class="copy" data-copy="${esc(resumeCmd(s))}">${L.copy}</button></div>
+    <div class="foot"><span class="model">${esc((s.model || '') + sub)}</span>${resumeCmd(s) ? `<button class="copy" data-copy="${esc(resumeCmd(s))}">${L.copy}</button>` : ''}</div>
   </div>`;
 }
 
@@ -461,6 +512,7 @@ function render() {
   const working = count((s) => ACTIVE.has(s));
   const needs = count(GROUPS[0].match);
   document.title = (needs ? `(${needs}!) ` : working ? `(${working}) ` : '') + L.title;
+  renderTeam();
 
   const main = document.getElementById('main');
   const officeMode = state.view === 'office';
@@ -488,7 +540,7 @@ function render() {
     refreshTip();
     return;
   }
-  const groups = PIP ? GROUPS.slice(0, 2) : GROUPS;
+  const groups = PIP && !TEAM ? GROUPS.slice(0, 2) : GROUPS;
   if (!list.some((s) => groups.some((g) => g.match(s.status)))) {
     main.innerHTML = `<div class="empty">${esc(PIP ? L.pipQuiet : L.empty)}</div>`;
     return;
@@ -511,6 +563,8 @@ function tickTimes() {
 }
 
 function onData(data) {
+  // Scope before notifications, counters, list rendering and Office updates.
+  if (TEAM) data = { ...data, sessions: data.sessions.filter(s => (s.teamId || 'ungrouped') === TEAM) };
   state.skew = Date.now() - data.now;
   const first = state.prev.size === 0;
   state.flash.clear();
@@ -618,9 +672,9 @@ function refreshTip() {
 }
 function hideTip() { tipKey = null; tipPinned = false; tip.style.display = 'none'; tip.classList.remove('pinned'); }
 const officeOpts = {
-  compact: PIP,
+  compact: PIP || !!TEAM,
   onFrame: (renderer) => popout?.drawPreview(renderer),
-  label: (s) => s.project || AGENT_NAME[s.agent] || s.agent,
+  label: (s) => (s.role === 'leader' ? '★ ' : '') + (s.displayName || s.paneId || s.project || AGENT_NAME[s.agent] || s.agent),
   onHover(s, at, click) {
     if (click) {
       if (!s) return hideTip();
@@ -728,43 +782,17 @@ sceneSel.addEventListener('click', async (e) => {
 // scene choice doesn't build the default office first and then swap.
 const scenesReady = loadScenes();
 
-// ---- version + one-click update
+// ---- local version only; updating is unavailable in this build
 const verEl = document.getElementById('ver');
 let verInfo = null;
 function renderVersion() {
   if (!verInfo) return;
-  let html = `<span>v${esc(verInfo.version)}</span>`;
-  if (verInfo.updateAvailable) {
-    html = verInfo.canUpdate
-      ? `<button id="updBtn">⬆ ${esc(L.update)} v${esc(verInfo.latest)}</button>` + html
-      : `<span>${esc(L.gitPull)} → v${esc(verInfo.latest)}</span>` + html;
-  }
-  verEl.innerHTML = html;
-  // a second, more visible way in, next to the title
-  const top = document.getElementById('newVer');
-  top.hidden = !(verInfo.updateAvailable && verInfo.canUpdate);
-  if (!top.hidden && !top.disabled) top.textContent = `⬆ ${L.newVersion} v${verInfo.latest}`;
-  top.onclick = () => { const b2 = document.getElementById('updBtn'); if (b2) { top.disabled = true; top.textContent = L.updating; b2.click(); } };
-  const b = document.getElementById('updBtn');
-  if (b) b.onclick = async () => {
-    b.disabled = true; b.textContent = L.updating;
-    const r = await fetch('/api/update', { method: 'POST', headers: { 'x-whatsmyagentdoing': 'update' } }).then((x) => x.json()).catch(() => ({ ok: false }));
-    if (!r.ok) { b.textContent = `${L.updateFailed}${r.error ? ': ' + r.error : ''}`; setTimeout(renderVersion, 4000); return; }
-    b.textContent = L.updated;
-    // the server restarts itself; reload once it answers again
-    const t0 = Date.now();
-    const wait = setInterval(() => {
-      fetch('/api/version', { cache: 'no-store' }).then((x) => x.json()).then((v) => {
-        if (v.version !== verInfo.version || Date.now() - t0 > 20000) { clearInterval(wait); location.reload(); }
-      }).catch(() => {});
-    }, 1000);
-  };
+  verEl.innerHTML = `<span>v${esc(verInfo.version)} · local only</span>`;
 }
 function loadVersion() {
   fetch('/api/version', { cache: 'no-store' }).then((r) => r.json()).then((v) => { verInfo = v; renderVersion(); }).catch(() => {});
 }
 loadVersion();
-setInterval(loadVersion, 30 * 60 * 1000);
 
 const langSel = document.getElementById('langSel');
 langSel.innerHTML = '<option value="auto"></option>' +
@@ -786,7 +814,7 @@ popout = new OfficePopout({
 // Both windows share preferences; keep filters, language, scene and badges in
 // sync even when changes come from the compact window or another open tab.
 window.addEventListener('storage', (e) => {
-  if (e.key !== null && !Object.keys(PREF_DEFAULTS).some((k) => e.key === 'wmad.' + k)) return;
+  if (e.key !== null && !Object.keys(PREF_DEFAULTS).some((k) => e.key === PREF_PREFIX + k)) return;
   Object.assign(state, readPreferences());
   langSel.value = state.lang;
   hideTip();
@@ -801,6 +829,7 @@ syncControls();
 scenesReady.then(() => makeOffice());
 connect();
 setInterval(tickTimes, 1000);
+window.teamOffice = { get teamId() { return TEAM; }, get snapshot() { return state.data; }, get office() { return office; }, get popout() { return popout; } };
 </script>
 </body>
 </html>

@@ -1,0 +1,53 @@
+/* The original office UI, framed as a house interior. No replacement renderer. */
+.team-nav { display:flex; align-items:center; flex-wrap:wrap; gap:18px; padding:0 0 22px; color:var(--muted); font-size:11px; }
+.team-nav a { color:var(--ink); text-decoration:none; border-bottom:1px solid var(--line); padding:4px 0; }
+.team-nav a:focus-visible { outline:2px solid var(--tool); outline-offset:4px; }
+.team-nav #teamScope { font:10px ui-monospace,monospace; letter-spacing:1px; }
+.private-note { margin-left:auto; color:#657a61; }
+.workspace-content, .workplace-main { min-width:0; }
+.status-policy { margin:0 0 18px; font-size:11px; color:var(--muted); }
+.team-office .wrap { max-width:1440px; }
+.team-office { padding:28px 32px 54px; }
+.team-office .workspace-content { display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:22px; align-items:start; }
+.team-office h1 { font-family:'Avenir Next','PingFang SC',sans-serif; font-size:27px; overflow-wrap:anywhere; }
+.team-office .office { height:min(68vh,730px); min-height:480px; }
+.team-office .grid { grid-template-columns:repeat(auto-fill,minmax(min(100%,310px),1fr)); }
+.team-office .team-roster { padding:18px 16px 6px; border:1px solid var(--line); border-radius:12px; background:var(--panel); max-height:calc(100vh - 180px); overflow:auto; }
+.roster-heading { display:flex; justify-content:space-between; gap:12px; align-items:center; padding-bottom:10px; border-bottom:1px solid var(--line); }
+.roster-heading h2 { margin:0; font-size:13px; }
+.roster-heading span { color:var(--muted); font:12px ui-monospace,monospace; }
+#leaderNote, .roster-empty { color:var(--muted); font-size:10px; line-height:1.6; }
+.team-member { padding:11px 0; border-bottom:1px solid var(--line); }
+.team-member:last-child { border:0; }
+.member-identity { display:flex; gap:7px; align-items:center; }
+.member-name { font-size:12px; font-weight:600; min-width:0; overflow-wrap:anywhere; }
+.role-label { color:#9b7327; font-size:9px; flex-shrink:0; }
+.member-meta { color:var(--muted); font:10px/1.5 ui-monospace,monospace; margin:5px 0 7px 27px; overflow-wrap:anywhere; }
+.member-state { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--s); }
+.member-state .dot { width:6px; height:6px; }
+.member-state code { margin-left:auto; font-size:10px; color:var(--muted); }
+.source-badge { display:inline-block; border:1px solid var(--line); border-radius:4px; padding:2px 5px; font-size:9px; font-weight:400; color:var(--muted); }
+.source-badge[data-source=log] { color:#537458; background:#78a3750c; }
+.source-badge[data-source=herdr] { color:#aa742d; background:#cf9d4d12; border-color:#cf9d4d50; }
+.member-sources { display:flex; align-items:center; gap:6px; margin-top:7px; }
+.stale-chip { font-size:9px; color:#ae752b; }
+.session-source { display:flex; align-items:center; gap:8px; color:var(--muted); font:10px ui-monospace,monospace; flex-wrap:wrap; }
+.team-source-warning { padding:10px 14px; border:1px solid #d2a364; border-radius:6px; background:#d2a36412; color:var(--muted); font-size:11px; }
+body.pip .team-nav, body.pip .status-policy, body.pip .team-source-warning, body.pip .team-roster { display:none!important; }
+body.pip .workspace-content, body.pip .workplace-main { display:contents; }
+body.pip .office { height:auto; min-height:120px; }
+.pip-team { width:100%; font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media(max-width:900px) {
+  .team-office { padding:20px 18px 50px; }
+  .team-office .workspace-content { grid-template-columns:minmax(0,1fr) 235px; gap:14px; }
+  .team-office .team-roster { padding:12px; }
+}
+@media(max-width:680px) {
+  .team-office .workspace-content { grid-template-columns:1fr; }
+  .team-office .team-roster { max-height:none; }
+  .team-office .office { height:55vh; min-height:350px; }
+  .team-office h1 { font-size:23px; }
+  .team-nav { gap:12px; padding-bottom:14px; }
+  .private-note { font-size:10px; }
+  body.pip .office { min-height:120px; }
+}
