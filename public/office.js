@@ -53,8 +53,8 @@
   const rand = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-  function palette() {
-    const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  function palette(lightTheme = false) {
+    const dark = !lightTheme && matchMedia('(prefers-color-scheme: dark)').matches;
     return dark ? {
       dark: true,
       wood1: '#4a3f35', wood2: '#453a31', woodLine: 'rgba(0,0,0,.22)',
@@ -187,10 +187,10 @@
   // ---------------------------------------------------------------- office
 
   class Office {
-    constructor(root, { onHover, label, onFrame, showAgent = true, compact = false } = {}) {
+    constructor(root, { onHover, label, onFrame, showAgent = true, compact = false, lightTheme = false } = {}) {
       this.root = root;
       this.onHover = onHover || (() => {});
-      this.label = label || ((s) => s.project || s.agent);
+      this.label = label || ((s) => s.displayName || s.paneId || s.project || s.agent);
       this.onFrame = onFrame;
       this.showAgent = showAgent;
       this.compact = compact;
@@ -207,11 +207,11 @@
       this.hit = [];
       this.hoverKey = null;
       this.t = performance.now();
-      this.pal = palette();
+      this.pal = palette(lightTheme);
       this.plan = this.buildPlan(0);
       this.cat = { x: this.plan.W - 3, y: this.plan.D - 2, path: [], until: 0, face: 1 };
       this.theme = matchMedia('(prefers-color-scheme: dark)');
-      this.onTheme = () => (this.pal = palette());
+      this.onTheme = () => (this.pal = palette(lightTheme));
       this.theme.addEventListener('change', this.onTheme);
 
       this.ro = new ResizeObserver(() => this.resize());
@@ -469,9 +469,11 @@
     // ------------------------------------------------------------ sessions → people
 
     update(sessions) {
-      const working = sessions.filter((s) => WORKING.has(s.status));
+      // Original activity controls desks vs wandering; team membership does
+      // not imply work. Only the explicit leader retains a neutral main seat.
+      const working = sessions.filter((s) => s.role === 'leader' || WORKING.has(s.status));
       const off = sessions
-        .filter((s) => !WORKING.has(s.status))
+        .filter((s) => s.role !== 'leader' && !WORKING.has(s.status))
         .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
       const wanderers = off.slice(0, MAX_WANDERERS);
       this.offDuty = off.length - wanderers.length;
@@ -486,10 +488,17 @@
 
       const workKeys = new Set(working.map((s) => s.key));
       for (const k of [...this.deskOf.keys()]) if (!workKeys.has(k)) this.deskOf.delete(k);
-      const used = new Set(this.deskOf.values());
       // Fill the desks that face us first so more faces and screens show.
       const desks = this.plan.desks;
       const order = desks.map((d, i) => i).sort((a, b) => (desks[a].side === 's') - (desks[b].side === 's') || a - b);
+      const leader = working.find(s => s.role === 'leader');
+      this.leaderDesk = leader ? order[0] : null;
+      if (leader) {
+        // Reserve the main seat even when the leader arrives after members.
+        for (const [key, index] of this.deskOf) if (index === this.leaderDesk && key !== leader.key) this.deskOf.delete(key);
+        this.deskOf.set(leader.key, this.leaderDesk);
+      }
+      const used = new Set(this.deskOf.values());
       for (const s of [...working].sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0))) {
         if (this.deskOf.has(s.key)) continue;
         const i = order.find((n) => !used.has(n));
@@ -553,7 +562,7 @@
     }
 
     goTo(p, target) {
-      if (p.placeOnArrive) {
+      if (p.placeOnArrive || this.reducedMotion) {
         p.x = target.x; p.y = target.y; p.path = []; p.placeOnArrive = false;
         return;
       }
@@ -1042,7 +1051,13 @@
       for (const [lx, ly] of [[0.05, 0.05], [1.27, 0.05], [0.05, 0.67], [1.27, 0.67]]) {
         this.box(x + lx, y + ly, 0, 0.08, 0.08, 0.72, pal.deskL, pal.deskL, pal.deskR);
       }
-      this.box(x, y, 0.72, 1.4, 0.8, 0.07, pal.deskTop, pal.deskL, pal.deskR);
+      const mainSeat = p?.s?.role === 'leader';
+      this.box(x, y, 0.72, 1.4, 0.8, 0.07, mainSeat ? '#e9c56d' : pal.deskTop, pal.deskL, pal.deskR);
+      if (mainSeat) {
+        const sign = this.iso(x + 1.1, y + 0.65, 1.02);
+        this.ctx.fillStyle = '#745116'; this.ctx.font = 'bold 13px Georgia';
+        this.ctx.textAlign = 'center'; this.ctx.fillText('★', sign.x, sign.y);
+      }
       const worker = p && p.mode === 'work' ? p : null;
       if (dk.side === 's') {
         const mx = x + 0.42, my = y + 0.1, mz = 0.79;
@@ -1138,6 +1153,7 @@
       if (p.mode === 'work' && p.desk) {
         const face = p.desk.side === 'n' ? 'front' : 'back';
         if (s.status === 'waiting' || s.status === 'error') return { pose: 'stand', face, act: 'wave', sitZ: 0 };
+        if (!WORKING.has(s.status)) return { pose: 'sit', face, act: null, sitZ: 0.34 };
         if (p.desk.pose === 'stand') return { pose: 'stand', face, act: 'station', sitZ: 0 };
         return { pose: 'sit', face, act: s.status === 'tool' || s.status === 'typing' ? 'type' : 'think', sitZ: 0.34 };
       }
@@ -1332,6 +1348,10 @@
 
       let top = y;
       if (p.mode === 'work' && !p.path.length) {
+        if (!WORKING.has(s.status)) {
+          const unknown = s.statusSource === 'herdr' && s.sourceStatus === 'unknown';
+          top = pill(unknown ? '?' : { done: '✓', idle: '·', interrupted: '■' }[s.status] || '·', '#fff', s.status === 'done' ? '#5f9a4c' : '#81877d', y - 12);
+        }
         const col = STATUS_COLOR[st] || '#888';
         if (st === 'thinking') {
           c.fillStyle = pal.bubble;
@@ -1495,9 +1515,9 @@
     frame(now) {
       const dt = Math.min(0.05, (now - this.last) / 1000);
       this.last = now;
-      this.t = now;
+      this.t = this.reducedMotion ? 0 : now;
       if (!this.visible) return;
-      this.step(dt);
+      this.step(this.reducedMotion ? 0 : dt);
       if (this.draw() !== false) {
         if (!this.first && ++this.framesShown === 3) this.markReady(true);
         // Capture immediately: a WebGL drawing buffer may be cleared after

@@ -85,7 +85,9 @@
       d.head.append(style);
       const frame = d.createElement('iframe');
       frame.title = this.text('title');
-      const url = new URL('/', location.href);
+      const url = new URL('/office', location.href);
+      const team = new URLSearchParams(location.search).get('team');
+      if (team) url.searchParams.set('team', team);
       url.searchParams.set('pip', '1');
       // Carry the current settings even if storage is unavailable. The page
       // validates these preferences before using them.

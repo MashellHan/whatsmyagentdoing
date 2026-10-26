@@ -8,6 +8,7 @@ const path = require('path');
 const PUBLIC = path.join(__dirname, '..', 'public');
 const STATIC = {
   '/': ['index.html', 'text/html; charset=utf-8'],
+  '/team-office.css': ['team-office.css', 'text/css; charset=utf-8'],
   '/office': ['index.html', 'text/html; charset=utf-8'],
   '/office/': ['index.html', 'text/html; charset=utf-8'],
   '/office.js': ['office.js', 'text/javascript; charset=utf-8'],
