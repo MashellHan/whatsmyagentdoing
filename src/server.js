@@ -8,6 +8,8 @@ const path = require('path');
 const PUBLIC = path.join(__dirname, '..', 'public');
 const STATIC = {
   '/': ['index.html', 'text/html; charset=utf-8'],
+  '/office': ['index.html', 'text/html; charset=utf-8'],
+  '/office/': ['index.html', 'text/html; charset=utf-8'],
   '/office.js': ['office.js', 'text/javascript; charset=utf-8'],
   '/office3d.js': ['office3d.js', 'text/javascript; charset=utf-8'],
   '/i18n.js': ['i18n.js', 'text/javascript; charset=utf-8'],
@@ -35,16 +37,33 @@ const ACTIVE = new Set(['thinking', 'tool', 'typing']);
 // Logs only record finished blocks, so a few states need a clock to resolve:
 // a reply with no follow-up is a finished turn, and an "active" session that
 // has gone silent for a long time was most likely closed mid-turn.
-function view(s, now, { privacy }) {
+function view(s, now, { privacy = true }) {
   const quiet = now - (s.lastEventAt || s.mtime || now);
   let status = s.status;
-  if (status === 'typing' && quiet > 45_000) status = 'done';
-  if (status === 'thinking' && quiet > 15 * 60_000) status = 'idle';
-  if (status === 'tool' && quiet > 45 * 60_000) status = 'idle';
-  if ((status === 'waiting' || status === 'error') && quiet > 2 * 3600_000) status = 'idle';
+  if ((s.statusSource || s.source) !== 'herdr') {
+    if (status === 'typing' && quiet > 45_000) status = 'done';
+    if (status === 'thinking' && quiet > 15 * 60_000) status = 'idle';
+    if (status === 'tool' && quiet > 45 * 60_000) status = 'idle';
+    if ((status === 'waiting' || status === 'error') && quiet > 2 * 3600_000) status = 'idle';
+  }
 
   const out = {
-    key: `${s.agent}:${s.id}`,
+    key: s.key || `${s.agent}:${s.id}`,
+    source: s.source || 'log',
+    sourceStatus: (s.statusSource || s.source) === 'herdr' ? s.sourceStatus : status,
+    statusSource: s.statusSource || (s.source === 'herdr' ? 'herdr' : 'log'),
+    herdrStatus: s.herdrStatus || (s.source === 'herdr' ? s.sourceStatus : null),
+    logKey: s.logKey || null,
+    logSessionId: s.logSessionId || null,
+    binding: s.binding || (s.source === 'herdr' ? 'log-unavailable' : 'unregistered-log'),
+    displayName: s.displayName || null,
+    teamId: s.teamId || 'ungrouped',
+    workspaceId: s.workspaceId || null,
+    paneId: s.paneId || null,
+    tabId: s.tabId || null,
+    role: s.role || 'member',
+    presence: s.presence || 'fresh',
+    capabilities: s.capabilities || { resume: true },
     agent: s.agent,
     id: s.id,
     sessionId: s.sessionId || null,
@@ -64,7 +83,7 @@ function view(s, now, { privacy }) {
     startedAt: s.startedAt,
   };
   if (privacy) {
-    out.prompt = out.reply = out.title = null;
+    out.prompt = out.reply = out.title = out.error = null;
     if (out.activity) out.activity = out.activity.split(/[:\s]/)[0];
   }
   return out;
@@ -81,15 +100,17 @@ function promptLanguage(raw) {
   return guessFromPrompts(recent);
 }
 
-function snapshot(watcher, opts) {
+function snapshot(watcher, opts = {}) {
   const now = Date.now();
   const raw = watcher.sessions();
   const sessions = raw.map((s) => view(s, now, opts));
   sessions.sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
-  return { now, lang: opts.demo ? null : promptLanguage(raw), sessions };
+  const teams = watcher.teams ? watcher.teams() : sessions.length ? [{ id: 'ungrouped', workspaceId: null, name: opts.demo ? '演示小屋' : '未分组', label: '未分组', presence: 'fresh' }] : [];
+  return { now, lang: opts.demo || opts.privacy !== false ? null : promptLanguage(raw), sessions, teams,
+    privacy: opts.privacy !== false, source: watcher.sourceInfo?.() || { kind: opts.demo ? 'demo' : 'logs', presence: 'fresh' } };
 }
 
-function createServer(watcher, opts, { onShutdown, onRestart } = {}) {
+function createServer(watcher, opts = {}, { onShutdown } = {}) {
   const clients = new Set();
   let last = '';
 
@@ -102,10 +123,12 @@ function createServer(watcher, opts, { onShutdown, onRestart } = {}) {
     last = sig;
     for (const res of clients) res.write(`data: ${body}\n\n`);
   };
-  watcher.on('change', () => push(false));
+  const onChange = () => push(false);
+  watcher.on('change', onChange);
   // Status can flip with no new log lines (see view()), so re-check on a clock.
-  setInterval(() => push(false), 5000).unref();
-  setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 20000).unref();
+  const clock = setInterval(() => push(false), 5000);
+  const heartbeat = setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 20000);
+  clock.unref(); heartbeat.unref();
 
   const server = http.createServer((req, res) => {
     // Refuse anything not addressed to loopback (blocks DNS-rebinding pages
@@ -115,7 +138,9 @@ function createServer(watcher, opts, { onShutdown, onRestart } = {}) {
       res.writeHead(403).end();
       return;
     }
-    const url = new URL(req.url, 'http://localhost');
+    let url;
+    try { url = new URL(req.url, 'http://localhost'); decodeURIComponent(url.pathname); }
+    catch { res.writeHead(400).end(); return; }
     if (STATIC[url.pathname]) {
       const [file, type] = STATIC[url.pathname];
       res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
@@ -137,16 +162,11 @@ function createServer(watcher, opts, { onShutdown, onRestart } = {}) {
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
       res.end(JSON.stringify({
         installed: have.map(({ id, name, version, credits, icon }) => ({ id, name, version, credits, icon })),
-        available: cat.filter((x) => !ids.has(x.id)).map(({ id, name, version, size, credits, icon }) => ({ id, name, version, size, credits, icon: icon || '🗺️' })),
+        available: [], // No download controls in the local-only build.
       }));
     } else if (url.pathname === '/api/scenes/install' && req.method === 'POST') {
-      // Same guard as shutdown: a custom header web pages can't send cross-site.
-      if (req.headers['x-whatsmyagentdoing'] !== 'install') { res.writeHead(403).end(); return; }
-      const id = url.searchParams.get('id') || '';
-      scenes.install(id).then(
-        (x) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, id: x.id })); },
-        (e) => { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: String(e.message || e) })); },
-      );
+      res.writeHead(403, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: false, error: 'Scene downloads disabled: local-only build.' }));
+      return;
     } else if (url.pathname === '/api/sessions') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(snapshot(watcher, opts)));
@@ -162,25 +182,14 @@ function createServer(watcher, opts, { onShutdown, onRestart } = {}) {
       for (const c of clients) c.end();
       setTimeout(onShutdown, 50);
     } else if (url.pathname === '/api/version') {
-      updater.checkLatest().finally(() => {
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-        res.end(JSON.stringify(updater.info()));
-      });
+        res.end(JSON.stringify({ version: updater.localVersion(), latest: null, updateAvailable: false, canUpdate: false, disabled: true }));
     } else if (url.pathname === '/api/update' && req.method === 'POST') {
-      // Same guard as shutdown: web pages can't send this header cross-site.
-      if (req.headers['x-whatsmyagentdoing'] !== 'update') { res.writeHead(403).end(); return; }
-      updater.update().then(
-        (version) => {
-          res.writeHead(200, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ ok: true, version }));
-          for (const c of clients) c.end();
-          if (onRestart) setTimeout(onRestart, 100);
-        },
-        (e) => { res.writeHead(400, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: String(e.message || e) })); },
-      );
+      res.writeHead(403, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: false, error: 'Updates disabled: local-only build.' }));
+      return;
     } else if (url.pathname === '/api/ping') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ app: 'whatsmyagentdoing' }));
+      res.end(JSON.stringify({ app: 'agent-office-team-houses' }));
     } else if (url.pathname === '/events') {
       res.writeHead(200, {
         'content-type': 'text/event-stream',
@@ -194,7 +203,8 @@ function createServer(watcher, opts, { onShutdown, onRestart } = {}) {
       res.writeHead(404).end();
     }
   });
+  server.on('close', () => { clearInterval(clock); clearInterval(heartbeat); watcher.off('change', onChange); });
   return server;
 }
 
-module.exports = { createServer, snapshot };
+module.exports = { createServer, snapshot, view };
