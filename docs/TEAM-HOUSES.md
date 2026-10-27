@@ -36,3 +36,11 @@ Optional `members` mappings may assign `dev` or `designer` roles, keyed by pane 
 `npm test` uses isolated synthetic records and temporary files. `npm run test:town` and `npm run test:ui` use local fixture servers and an installed Playwright/Chromium. Set `WMAD_BROWSER_EXECUTABLE` to an existing browser executable if Chrome is not in its default location. Do not download dependencies merely to run the dashboard.
 
 All public tests use synthetic data. Keep local mapping files, real status evidence and internal rule documents out of pull requests. This fork does not send terminal input, publish state, or deploy a remote service.
+
+## Accessible garden neighborhood
+
+Houses keep their team colors in every state. Busy houses emit continuous chimney puffs, move a rooftop flag and a clipped window silhouette. Idle houses close their curtains and show a sleeping cat and Zzz. Monochrome symbols and text also identify waiting, unknown and empty houses. Manual pause, system reduced-motion and stale snapshots use deterministic static alternatives while counts keep updating.
+
+Lawns, shrubs, small flower beds and street trees stay clear of the artwork and naturally-sized signs. Layout measurements handle long text and one-column mobile streets. `npm run test:town` checks five states, same-house colors, 12-second motion continuity, stale/reduce/pause, 13-house layouts and 200% text.
+
+For safe sample images, run `HOMEPAGE_CAPTURE_FIXTURE=1 npm run capture:homepage` using an already installed browser. Without that flag the script reads only the local dashboard, and those outputs must remain private.
