@@ -50,7 +50,7 @@
     font: 14px/1.45 ui-sans-serif, -apple-system, "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
     padding: 24px 16px 64px;
   }
-  .wrap { max-width: 1180px; margin: 0 auto; }
+  .wrap { margin: 0 auto; }
   header { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 24px; margin-bottom: 16px; }
   h1 { font-size: 19px; margin: 0; letter-spacing: -.01em; }
   h1 span { color: var(--ink); font-weight: 600; }
@@ -278,6 +278,10 @@
     <button class="btn" id="closePreview" data-t="pipStop"></button>
   </div>
   <div id="officeWrap">
+    <div id="stageScale" aria-label="画布尺度">
+      <div class="seg" role="group" aria-label="画布显示模式"><button type="button" data-scale="wide">宽屏大图</button><button type="button" data-scale="fit">适窗全景</button></div>
+      <span class="stage-note" id="stageNote">完整房间等比显示</span>
+    </div>
     <div class="office loading" id="office"><div class="office-loader"><div class="spin"></div><span id="loaderText"></span></div></div>
     <div class="legend" id="legend"></div>
     <div class="legend" id="agentLegend"></div>
@@ -531,6 +535,7 @@ function render() {
     office.setVisible(officeMode && !poppedOut);
     office.update(officeList);
   }
+  scheduleStageLayout();
   document.getElementById('idleToggle').style.display = officeMode ? 'none' : '';
   if (poppedOut) {
     document.getElementById('officeWrap').style.display = 'none';
@@ -676,7 +681,8 @@ function refreshTip() {
 }
 function hideTip() { tipKey = null; tipPinned = false; tip.style.display = 'none'; tip.classList.remove('pinned'); }
 const officeOpts = {
-  compact: PIP || !!TEAM,
+  compact: PIP,
+  screenLabels: true,
   onFrame: (renderer) => popout?.drawPreview(renderer),
   label: (s) => (s.role === 'leader' ? '★ ' : '') + (s.displayName || s.paneId || s.project || AGENT_NAME[s.agent] || s.agent),
   onHover(s, at, click) {
@@ -696,6 +702,58 @@ let officeKind = null;
 // Until the new office has drawn a settled frame, show a loader instead of a
 // half-built scene.
 const officeEl = document.getElementById('office');
+// Scale is window-local presentation, never a synced team preference.
+let stageChoice = null, stageFrame = 0;
+function scheduleStageLayout() {
+  if (!stageFrame) stageFrame = requestAnimationFrame(layoutStage);
+}
+function layoutStage() {
+  stageFrame = 0;
+  if (PIP || !office || !officeEl.checkVisibility()) return;
+  const desktop = innerWidth >= 1200;
+  const wide = desktop && (stageChoice || 'wide') === 'wide';
+  const scale = document.getElementById('stageScale');
+  scale.hidden = innerWidth <= 900;
+  scale.querySelector('[data-scale=wide]').disabled = !desktop;
+  for (const button of scale.querySelectorAll('button')) {
+    const selected = button.dataset.scale === (wide ? 'wide' : 'fit');
+    button.classList.toggle('on', selected); button.setAttribute('aria-pressed', String(selected));
+  }
+  document.getElementById('stageNote').textContent = wide ? '完整大图 · 页面可向下滚动；3D 拖动旋转' : '适窗全景 · 完整房间等比显示';
+  officeEl.dataset.scale = wide ? 'wide' : 'fit';
+  let height;
+  if (wide) {
+    // Canonical scene envelope: bundled 3D direction (0.62,0.58,0.62),
+    // its 6%/10% margins and 48px label allowance. Same stage for both qualities.
+    const { W, D } = office.plan, wall = office.plan.viewH || 2.4;
+    const sum = W + D, length = Math.hypot(.62,.58,.62);
+    const bw3 = sum / Math.SQRT2;
+    const bh3 = sum * (.58 / length) / Math.SQRT2 + wall * (Math.hypot(.62,.62) / length);
+    const cw = officeEl.clientWidth;
+    const h3 = cw * (bh3 * 1.1) / (bw3 * 1.06) + 48;
+    const envelope = office.sceneBounds2D();
+    const h2 = (cw - 64) * (envelope.bottom-envelope.top) / (envelope.right-envelope.left) + 100;
+    height = Math.max(480,Math.ceil(Math.max(h2,h3)));
+  } else if (innerWidth > 900) {
+    const top = officeEl.getBoundingClientRect().top + scrollY;
+    const legends = ['legend','agentLegend'].reduce((h,id) => h + document.getElementById(id).getBoundingClientRect().height + 10,0);
+    height = Math.max(360,Math.floor(innerHeight - top - legends - 16));
+  }
+  const value = height ? `${height}px` : '';
+  if (officeEl.style.getPropertyValue('--stage-height') !== value) {
+    if (value) officeEl.style.setProperty('--stage-height',value); else officeEl.style.removeProperty('--stage-height');
+  }
+  if (office.controls) office.controls.enableZoom = !wide;
+}
+document.getElementById('stageScale').addEventListener('click',e => {
+  const button = e.target.closest('[data-scale]'); if (!button) return;
+  stageChoice = button.dataset.scale;
+  layoutStage(); office?.resize();
+  if (office?.fitCamera3D) office.fitCamera3D(true);
+});
+const stageObserver = new ResizeObserver(scheduleStageLayout);
+for (const el of [document.querySelector('.workplace-main'),document.querySelector('header'),document.getElementById('teamNav'),document.getElementById('statusPolicy'),document.getElementById('teamSourceWarning')]) stageObserver.observe(el);
+window.addEventListener('resize',scheduleStageLayout);
 function setLoading(on, text) {
   officeEl.classList.toggle('loading', on);
   if (text) document.getElementById('loaderText').textContent = text;
@@ -710,6 +768,9 @@ async function makeOffice() {
   let Cls = window.Office;
   const opts = { ...officeOpts, showAgent: state.showAgent };
   if (high) {
+    // Reuse the bundle's zoom=1/screen-label fit. Stage size is independent of
+    // this legacy flag; do not reintroduce TEAM-dependent small-window sizing.
+    opts.compact = true;
     try {
       Cls = (await import('/office3d.js')).Office3D;
       if (scene !== 'office') {

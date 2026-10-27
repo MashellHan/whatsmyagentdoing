@@ -187,13 +187,15 @@
   // ---------------------------------------------------------------- office
 
   class Office {
-    constructor(root, { onHover, label, onFrame, showAgent = true, compact = false, lightTheme = false } = {}) {
+    constructor(root, { onHover, label, onFrame, showAgent = true, compact = false, screenLabels = compact, lightTheme = false } = {}) {
       this.root = root;
       this.onHover = onHover || (() => {});
       this.label = label || ((s) => s.displayName || s.paneId || s.project || s.agent);
       this.onFrame = onFrame;
       this.showAgent = showAgent;
       this.compact = compact;
+      this.screenLabels = screenLabels;
+      this.cw = this.ch = this.dpr = 1;
       this.offDutyLabel = 'went home';
       this.canvas = document.createElement('canvas');
       this.canvas.className = 'office-canvas';
@@ -214,8 +216,11 @@
       this.onTheme = () => (this.pal = palette(lightTheme));
       this.theme.addEventListener('change', this.onTheme);
 
-      this.ro = new ResizeObserver(() => this.resize());
+      this.onResize = () => { if (this.needsResize()) this.resize(); };
+      this.ro = new ResizeObserver(this.onResize);
       this.ro.observe(root);
+      window.addEventListener('resize', this.onResize);
+      this.watchDpr();
       this.canvas.addEventListener('mousemove', (e) => this.pointer(e));
       this.canvas.addEventListener('click', (e) => this.pointer(e, true));
       this.canvas.addEventListener('mouseleave', () => { this.hoverKey = null; this.onHover(null); });
@@ -233,6 +238,8 @@
       this.dead = true;
       cancelAnimationFrame(this.raf);
       this.ro.disconnect();
+      window.removeEventListener('resize', this.onResize);
+      this.dprQuery?.removeEventListener('change', this.onDpr);
       this.theme.removeEventListener('change', this.onTheme);
       this.canvas.remove();
     }
@@ -600,30 +607,60 @@
       this.goTo(p, choice);
     }
 
-    setVisible(v) { this.visible = v; if (v) this.resize(); }
+    setVisible(v) { this.visible = v; if (v && this.needsResize()) this.resize(); }
 
     // ------------------------------------------------------------ camera / input
 
+    watchDpr() {
+      this.dprQuery?.removeEventListener('change', this.onDpr);
+      this.dprQuery = matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+      this.onDpr = () => { this.onResize(); this.watchDpr(); };
+      this.dprQuery.addEventListener('change', this.onDpr);
+    }
+
+    needsResize() {
+      return this.root.clientWidth > 0 && this.root.clientHeight > 0 &&
+        (this.cw !== this.root.clientWidth || this.ch !== this.root.clientHeight || this.deviceDpr !== (window.devicePixelRatio || 1));
+    }
+
     resize() {
-      const r = this.root.getBoundingClientRect();
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      this.cw = Math.max(this.compact ? 1 : 200, r.width);
-      this.ch = Math.max(this.compact ? 1 : 240, r.height);
+      // All projection/input coordinates are CSS content pixels, never border-box
+      // pixels or a CSS-stretched old bitmap. Hidden renderers retain their size.
+      const cw = this.root.clientWidth, ch = this.root.clientHeight;
+      if (!cw || !ch) return;
+      this.deviceDpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(2, this.deviceDpr, Math.sqrt(24000000 / (cw * ch)));
+      // Also runs on the subclass's first resize, after WebGL is constructed.
+      if (this.gl) {
+        const glDpr = Math.min(2, this.deviceDpr, Math.sqrt(12000000 / (cw * ch)), this.gl.capabilities.maxTextureSize / Math.max(cw,ch));
+        if (this.gl.getPixelRatio() !== glDpr) this.gl.setPixelRatio(glDpr);
+      }
+      if (this.cw === cw && this.ch === ch && this.dpr === dpr) return;
+      this.cw = cw; this.ch = ch;
       this.canvas.width = Math.round(this.cw * dpr);
       this.canvas.height = Math.round(this.ch * dpr);
       this.canvas.style.width = this.cw + 'px';
       this.canvas.style.height = this.ch + 'px';
       this.dpr = dpr;
+      this.fitCamera();
+    }
+
+    sceneBounds2D() {
+      const { W, D } = this.plan;
+      // Full floor + 2.4-high walls, with world-space allowance for feet,
+      // furniture edges and shadows. Label padding is separately in CSS pixels.
+      return { left:this.iso(0,D).x-12, right:this.iso(W,0).x+12,
+        top:this.iso(0,0,this.plan.viewH || WALL_H).y-12, bottom:this.iso(W,D).y+18 };
     }
 
     fitCamera() {
-      const { W, D } = this.plan;
-      const left = this.iso(0, D, 0).x, right = this.iso(W, 0, 0).x;
-      const top = this.iso(0, 0, WALL_H).y - 20, bottom = this.iso(W, D, 0).y + 10;
-      const zoom = Math.min(this.cw / (right - left + 30), this.ch / (bottom - top + 30), 2);
-      const want = { zoom, ox: this.cw / 2 - ((left + right) / 2) * zoom, oy: this.ch / 2 - ((top + bottom) / 2) * zoom };
-      if (!this.cam) this.cam = want;
-      else for (const k of ['zoom', 'ox', 'oy']) this.cam[k] += (want[k] - this.cam[k]) * 0.1;
+      const {left,right,top,bottom} = this.sceneBounds2D();
+      const side = this.cw < 600 ? 12 : 32, above = this.ch < 300 ? 40 : 72, below = this.ch < 300 ? 12 : 28;
+      const width = Math.max(1,this.cw-2*side), height = Math.max(1,this.ch-above-below);
+      const zoom = Math.min(width/(right-left),height/(bottom-top));
+      // No arbitrary zoom<=2 cap and no easing that clips after a shrink.
+      this.cam = {zoom,ox:side+(width-(right-left)*zoom)/2-left*zoom,
+        oy:above+(height-(bottom-top)*zoom)/2-top*zoom};
     }
 
     pointer(e, click) {
@@ -1323,7 +1360,12 @@
       const s = p.s || {};
       const st = s.status;
       const pal = this.pal;
-      const x = at.x, y = at.y - 6;
+      // Small PiP canvases can fit the model but leave a screen-space name pill
+      // just above the top edge. Keep the whole original label group in bounds;
+      // its text size and the room's projection are not reduced to make it fit.
+      const screen = this.screenLabels || !!this.gl;
+      const x = screen ? clamp(at.x, Math.min(84,this.cw/2), Math.max(this.cw-84,this.cw/2)) : at.x;
+      const y = screen ? Math.max(52,at.y-6) : at.y-6;
       c.save();
       c.textAlign = 'center';
       c.textBaseline = 'middle';
@@ -1517,6 +1559,10 @@
       this.last = now;
       this.t = this.reducedMotion ? 0 : now;
       if (!this.visible) return;
+      // Compatibility with the existing 3D bundle: a larger desk plan can remove
+      // foosball. Its old animated rods otherwise dereference a missing prop in
+      // draw(), after the room has already been rebuilt. No plan/state changes.
+      if (this.gl && this.builtPlan !== this.plan && !this.plan.props?.some(p => p.t === 'foosball')) this.rods = null;
       this.step(this.reducedMotion ? 0 : dt);
       if (this.draw() !== false) {
         if (!this.first && ++this.framesShown === 3) this.markReady(true);
@@ -1578,7 +1624,7 @@
         else it.draw();
       }
       this.pingPongBall();
-      if (this.compact) {
+      if (this.screenLabels) {
         // Keep labels readable when the room is scaled down for PiP.
         c.save();
         c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);

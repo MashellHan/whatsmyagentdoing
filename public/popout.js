@@ -70,7 +70,7 @@
     }
 
     async openDocument() {
-      const win = await window.documentPictureInPicture.requestWindow({ width: 480, height: 400 });
+      const win = await window.documentPictureInPicture.requestWindow(innerWidth >= 1200 ? { width: 640, height: 480 } : { width: 480, height: 400 });
       if (win.closed) return;
       this.win = win;
       win.addEventListener('pagehide', () => {
@@ -111,9 +111,8 @@
 
     async startPreview() {
       this.captureCanvas = document.createElement('canvas');
-      this.captureCanvas.width = 960;
-      this.captureCanvas.height = 540;
       this.captureContext = this.captureCanvas.getContext('2d');
+      this.sizePreview(this.office(), true);
       this.stream = this.captureCanvas.captureStream(15);
       this.video.srcObject = this.stream;
       this.panel.hidden = false;
@@ -134,15 +133,28 @@
 
     drawPreview(office) {
       if (!this.stream || !office.canvas.width || !office.canvas.height) return;
+      this.sizePreview(office);
       const c = this.captureContext;
       const w = this.captureCanvas.width, h = this.captureCanvas.height;
       c.fillStyle = office.pal.dark ? '#1e1e1c' : '#fff';
       c.fillRect(0, 0, w, h);
-      const scale = Math.min(w / office.canvas.width, h / office.canvas.height);
-      const dw = office.canvas.width * scale, dh = office.canvas.height * scale;
+      // GL and overlay may have different backing DPRs but share CSS coordinates.
+      const scale = Math.min(w / office.cw, h / office.ch);
+      const dw = office.cw * scale, dh = office.ch * scale;
       const x = (w - dw) / 2, y = (h - dh) / 2;
       if (office.gl) c.drawImage(office.gl.domElement, x, y, dw, dh);
       c.drawImage(office.canvas, x, y, dw, dh);
+    }
+
+    sizePreview(office, immediate = false) {
+      const cw = office?.cw || 640, ch = office?.ch || 480;
+      const scale = 1280 / Math.max(cw,ch);
+      const width = Math.max(1,Math.round(cw*scale)), height = Math.max(1,Math.round(ch*scale));
+      if (!this.previewSize || this.previewSize.width !== width || this.previewSize.height !== height) this.previewSize = {width,height,since:performance.now()};
+      // Keep the stream and buffers stable through a continuous window drag.
+      if (!immediate && performance.now()-this.previewSize.since < 120) return;
+      if (this.captureCanvas.width !== width) this.captureCanvas.width = width;
+      if (this.captureCanvas.height !== height) this.captureCanvas.height = height;
     }
 
     stopPreview() {
@@ -155,6 +167,7 @@
       this.video.pause();
       this.video.srcObject = null;
       this.captureCanvas = this.captureContext = null;
+      this.previewSize = null;
       this.panel.hidden = true;
       this.changed();
     }

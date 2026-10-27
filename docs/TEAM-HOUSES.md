@@ -44,3 +44,9 @@ Houses keep their team colors in every state. Busy houses emit continuous chimne
 Lawns, shrubs, small flower beds and street trees stay clear of the artwork and naturally-sized signs. Layout measurements handle long text and one-column mobile streets. `npm run test:town` checks five states, same-house colors, 12-second motion continuity, stale/reduce/pause, 13-house layouts and 200% text.
 
 For safe sample images, run `HOMEPAGE_CAPTURE_FIXTURE=1 npm run capture:homepage` using an already installed browser. Without that flag the script reads only the local dashboard, and those outputs must remain private.
+
+## Wide desktop canvases
+
+Desktop maps use the available window width, and house SVGs actually render at larger dimensions. Room canvases offer a full-width large stage (natural page scrolling) and a fit-to-window overview. The same room is contained without cropping, scaling geometry equally; small screens keep a compact stage with the roster below. PiP retains its own viewport and supports both original paths.
+
+`npm run test:wide` measures actual person/furniture projection, full-room/label containment, 1440/1920/2560 widths, mobile and PiP sizes, DPR and pixel budgets. It uses synthetic fixtures only. Large canvases can exceed the viewport height: use page scrolling or select fit mode; 3D wheel zoom is disabled in large-stage mode so scrolling remains possible.
