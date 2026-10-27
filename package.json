@@ -39,7 +39,7 @@
     "three": "^0.186.1"
   },
   "scripts": {
-    "test": "node --test tests/watcher.cjs tests/herdr.cjs tests/teams.cjs tests/office-team.cjs tests/homepage.cjs tests/local-safety.cjs tests/cloud.cjs",
+    "test": "node --test tests/watcher.cjs tests/herdr.cjs tests/teams.cjs tests/office-team.cjs tests/homepage.cjs tests/local-safety.cjs tests/cloud.cjs tests/rules.cjs",
     "test:town": "node tests/homepage-ui.cjs && node tests/town.cjs",
     "test:wide": "node tests/wide-ui.cjs",
     "capture:homepage": "node scripts/capture-homepage.cjs",

@@ -24,6 +24,7 @@ const TYPES = { '.js': 'text/javascript; charset=utf-8', '.glb': 'model/gltf-bin
 const MOUNTS = { '/assets/': path.join(__dirname, '..', 'assets') };
 const scenes = require('./scenes');
 const updater = require('./update');
+const { RulesReader } = require('./rules');
 
 function serveFile(res, root, rel) {
   const file = path.normalize(path.join(root, rel));
@@ -114,7 +115,8 @@ function snapshot(watcher, opts = {}) {
     privacy: opts.privacy !== false, source: watcher.sourceInfo?.() || { kind: opts.demo ? 'demo' : 'logs', presence: 'fresh' } };
 }
 
-function createServer(watcher, opts = {}, { onShutdown } = {}) {
+function createServer(watcher, opts = {}, { onShutdown, rulesReader } = {}) {
+  const rules = rulesReader || (typeof watcher.ruleContext === 'function' ? new RulesReader(team => watcher.ruleContext(team)) : null);
   const clients = new Set();
   let last = '';
 
@@ -145,7 +147,35 @@ function createServer(watcher, opts = {}, { onShutdown } = {}) {
     let url;
     try { url = new URL(req.url, 'http://localhost'); decodeURIComponent(url.pathname); }
     catch { res.writeHead(400).end(); return; }
-    if (STATIC[url.pathname]) {
+    if (url.pathname === '/api/rules' || url.pathname.startsWith('/api/rules/')) {
+      // Local rule files have a stricter boundary than ordinary status data.
+      // The custom header is a cross-origin preflight guard, not authentication.
+      const origin = `http://${req.headers.host}`;
+      const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+      const fetchSite = req.headers['sec-fetch-site'];
+      const writeJSON = (status, body) => {
+        res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+        res.end(JSON.stringify(body));
+      };
+      if (!local || req.method !== 'GET' || req.headers['x-agent-office-rule-read'] !== '1' ||
+          (req.headers.origin && req.headers.origin !== origin) || (fetchSite && fetchSite !== 'same-origin') ||
+          req.headers['x-forwarded-for'] || req.headers['x-forwarded-host'] || req.headers.range) {
+        writeJSON(403, { error: 'local_same_origin_only' }); return;
+      }
+      if (url.pathname === '/api/rules/capabilities') {
+        writeJSON(200, { enabled: !!rules }); return;
+      }
+      const team = url.searchParams.get('team'), id = url.searchParams.get('id');
+      const allowed = url.pathname === '/api/rules' ? ['team'] : url.pathname === '/api/rules/file' ? ['team', 'id'] : [];
+      if (!rules || !team || team.length > 100 || !allowed.length || [...url.searchParams.keys()].some(k => !allowed.includes(k)) ||
+          [...new Set(url.searchParams.keys())].some(k => url.searchParams.getAll(k).length !== 1)) {
+        writeJSON(404, { error: 'not_found' }); return;
+      }
+      Promise.resolve().then(() => url.pathname === '/api/rules' ? rules.list(team) : rules.read(team, id)).then(
+        body => writeJSON(200, body), error => writeJSON(error.status || 503, { error: error.code || 'reader_unavailable' }),
+      );
+      return;
+    } else if (STATIC[url.pathname]) {
       const [file, type] = STATIC[url.pathname];
       res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
       fs.createReadStream(path.join(PUBLIC, file)).pipe(res);
