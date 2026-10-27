@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>团队小镇 · Agent Office</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%23456e57' d='M2 15 16 3 30 15v15H2z'/%3E%3Cpath fill='%23ffdc94' d='M12 19h8v11h-8z'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/town.css">
+  <script src="/town.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="团队小镇首页"><span class="brand-mark">⌂</span><span>Agent Office<small>团队小镇 / LOCAL EDITION</small></span></a>
+    <div class="header-meta"><a href="/office?view=office">全部办公室</a><a href="/office?view=list">全部列表</a><span class="privacy">▣ 隐私模式</span><span class="connection" id="connection" role="status">正在连接…</span></div>
+  </header>
+  <main>
+    <section id="town-view" aria-labelledby="town-title">
+      <div class="intro"><div><p class="eyebrow">A NEIGHBORHOOD OF TEAMS</p><h1 id="town-title">沿着小路，看看大家<span>。</span></h1><p class="intro-copy">灯亮时，任务正在进行；灯暗时，整个团队正闲着。<br>走进任一小屋，打开原版办公室。</p></div>
+        <div class="overview" aria-label="团队活动总览"><span id="summary-freshness" class="summary-freshness">正在读取状态…</span><div class="town-stats"><div><strong id="busy-team-count">—</strong><span><i class="stat-dot busy"></i>团队在忙</span></div><div><strong id="idle-team-count">—</strong><span><i class="stat-dot idle"></i>团队全闲</span></div><div><strong id="working-count">—</strong><span>正在工作的 agent</span></div></div><p id="overview-note">等待本机快照</p></div>
+      </div>
+      <div class="town-map">
+        <div class="map-caption"><span>⌖ LOCAL · 团队街区</span><span id="map-note">NEIGHBORHOOD MAP <i>↑ N</i></span></div>
+        <div id="neighborhood" class="neighborhood">
+          <div class="streets" aria-hidden="true"><div class="avenue"><span>TEAM LANE</span></div><div class="plaza"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#e9e0c8" stroke="#c1b697" stroke-width="2"/><circle cx="50" cy="50" r="29" fill="#b3cbbd" stroke="#8eae9d" stroke-width="5"/><ellipse cx="50" cy="54" rx="19" ry="11" fill="none" stroke="#dce8d9" stroke-width="2"/><path d="M50 61V33m0 0c-11-9-15 1-15 7m15-7c11-9 15 1 15 7" fill="none" stroke="#edf1df" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="62" r="6" fill="#91ada0"/></svg><span>小镇广场</span></div></div>
+          <div id="houses" class="houses" aria-label="团队房屋"></div>
+          <div class="street-decor" aria-hidden="true"><i class="street-tree tree-west"></i><i class="street-tree tree-east"></i><i class="street-lamp lamp-west"></i><i class="street-lamp lamp-east"></i><i class="street-bench"></i><span class="street-label">花园街 · GARDEN WALK</span></div>
+        </div>
+        <div id="empty" class="empty" hidden>还没有小屋。请确认服务从 Herdr pane 启动，稍后将自动重试。</div>
+        <div class="map-footer"><span>点击房子 → 办公室 / 列表 / 画中画</span><span>只观察，不打扰</span></div>
+      </div>
+    </section>
+    <div id="source-warning" class="source-warning" role="status" hidden></div>
+    <div class="legend" aria-label="团队状态图例"><span><i data-status="busy"></i>忙碌中 · 灯亮</span><span><i data-status="idle"></i>整体闲着 · 灯暗</span><span><i data-status="attention"></i>等待处理</span><span><i data-status="unknown"></i>状态未明</span></div>
+    <p class="counting-note">忙碌 = 思考 / 执行 / 回复；全闲 = 所有成员均闲置、完成或中断。等待处理、未知和空屋不计全闲。未分组不计团队数，计入 agent 总数。</p>
+  </main>
+  <footer class="site-footer"><span>状态来自原版会话日志；无法关联时回退 Herdr。只读，无自动更新。</span><span>127.0.0.1 ONLY <b>·</b> READ ONLY <b>·</b> NO PROMPTS</span></footer>
+</body>
+</html>

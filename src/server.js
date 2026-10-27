@@ -7,7 +7,10 @@ const path = require('path');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
 const STATIC = {
-  '/': ['index.html', 'text/html; charset=utf-8'],
+  '/': ['town.html', 'text/html; charset=utf-8'],
+  '/town': ['town.html', 'text/html; charset=utf-8'],
+  '/town.js': ['town.js', 'text/javascript; charset=utf-8'],
+  '/town.css': ['town.css', 'text/css; charset=utf-8'],
   '/team-office.css': ['team-office.css', 'text/css; charset=utf-8'],
   '/office': ['index.html', 'text/html; charset=utf-8'],
   '/office/': ['index.html', 'text/html; charset=utf-8'],

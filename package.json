@@ -39,7 +39,8 @@
     "three": "^0.186.1"
   },
   "scripts": {
-    "test": "node --test tests/watcher.cjs tests/herdr.cjs tests/teams.cjs tests/office-team.cjs",
+    "test": "node --test tests/watcher.cjs tests/herdr.cjs tests/teams.cjs tests/office-team.cjs tests/homepage.cjs",
+    "test:town": "node tests/homepage-ui.cjs && node tests/town.cjs",
     "build": "esbuild web/office3d.js --bundle --format=esm --minify --target=es2020 --outfile=public/office3d.js --legal-comments=eof",
     "start": "node bin/cli.js",
     "test:ui": "node tests/ui.cjs",
