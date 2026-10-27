@@ -89,6 +89,8 @@ class HerdrWatcher extends EventEmitter {
         const displayName = text(a.name) || a.pane_id;
         const config = this.teamMap.workspaces?.[a.workspace_id];
         const leader = config?.leaderPane === a.pane_id && (!config.expectedName || config.expectedName === displayName);
+        const memberConfig = this.teamMap.members?.[a.pane_id];
+        const memberRole = memberConfig?.expectedName === displayName && ['dev', 'designer'].includes(memberConfig.role) ? memberConfig.role : 'member';
         if (!houses.has(a.workspace_id)) houses.set(a.workspace_id, {
           id: a.workspace_id, workspaceId: a.workspace_id, name: a.workspace_id,
           label: a.workspace_id, sourceStatus: 'unknown', presence: 'fresh',
@@ -101,7 +103,7 @@ class HerdrWatcher extends EventEmitter {
           sourceStatus, status: STATES[sourceStatus], displayName,
           teamId: a.workspace_id, workspaceId: a.workspace_id,
           paneId: a.pane_id, tabId: text(a.tab_id),
-          role: leader ? 'leader' : 'member', presence: 'fresh',
+          role: leader ? 'leader' : memberRole, presence: 'fresh',
           capabilities: { resume: false },
           startedAt: old?.startedAt || now,
           lastEventAt: changed ? now : old.lastEventAt,

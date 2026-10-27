@@ -29,6 +29,8 @@ Configure known leaders explicitly in `config/team-houses.json` (or `--team-map 
 
 No role is inferred from pane order, project directory, or a name containing “leader”. The leader keeps a neutral main seat when idle; other members keep original work/wander/off-duty behavior.
 
+Optional `members` mappings may assign `dev` or `designer` roles, keyed by pane ID and guarded by an exact `expectedName`. A renamed/replaced occupant safely falls back to member. These badges appear in the room roster and list; they do not change activity or elect a leader. Keep real mappings local.
+
 ## Checks
 
 `npm test` uses isolated synthetic records and temporary files. `npm run test:town` and `npm run test:ui` use local fixture servers and an installed Playwright/Chromium. Set `WMAD_BROWSER_EXECUTABLE` to an existing browser executable if Chrome is not in its default location. Do not download dependencies merely to run the dashboard.
