@@ -895,6 +895,27 @@ scenesReady.then(() => makeOffice());
 connect();
 setInterval(tickTimes, 1000);
 window.teamOffice = { get teamId() { return TEAM; }, get snapshot() { return state.data; }, get office() { return office; }, get popout() { return popout; } };
+// Local L2 only. Never load the reader/assets from the remote viewer or PiP.
+// Capability discovery contains no file metadata and never prefetches a list.
+if (TEAM && TEAM !== 'ungrouped' && !PIP && ['localhost', '127.0.0.1'].includes(location.hostname)) {
+  const rulesCapability = new AbortController();
+  let rulesPageLeft = false;
+  window.addEventListener('pagehide', () => { rulesPageLeft = true; rulesCapability.abort(); }, { once: true });
+  fetch('/api/rules/capabilities', {
+    headers: { 'x-agent-office-rule-read': '1' }, cache: 'no-store', mode: 'same-origin',
+    credentials: 'same-origin', redirect: 'error', signal: rulesCapability.signal,
+  }).then(async response => {
+    if (!response.ok || rulesPageLeft) return;
+    const capability = await response.json();
+    if (capability.enabled !== true || rulesPageLeft) return;
+    const { mountRulesUI } = await import('/rules-ui.js');
+    if (!rulesPageLeft) mountRulesUI({
+      team: TEAM,
+      teamName: () => state.data.teams?.find(t => t.id === TEAM)?.name || TEAM,
+      beforeOpen: () => { settingsMenu.open = false; hideTip(); },
+    });
+  }).catch(() => { /* Fail closed: unsupported/local-disabled servers keep the entry absent. */ });
+}
 </script>
 </body>
 </html>

@@ -1,0 +1,79 @@
+/* Isolated reader styles: no changes to stage, renderer, roster or PiP layout. */
+.rules-entry { min-height:44px; min-width:44px; display:inline-flex; align-items:center; gap:7px; }
+.rules-entry-icon { font-size:18px; }
+.rules-dialog { box-sizing:border-box; width:min(1120px,calc(100vw - 64px)); height:min(840px,calc(100dvh - 64px)); max-width:none; max-height:none; padding:0; border:1px solid var(--line); border-radius:14px; color:var(--ink); background:var(--panel); box-shadow:0 24px 80px #0004; overflow:hidden; }
+.rules-dialog[open] { display:flex; flex-direction:column; }
+.rules-dialog::backdrop { background:#171b22a6; }
+.rules-dialog * { box-sizing:border-box; min-width:0; }
+.rules-dialog button { min-height:44px; min-width:44px; border:1px solid var(--line); border-radius:6px; padding:8px 12px; font:inherit; font-size:13px; color:var(--ink); background:var(--panel); cursor:pointer; }
+.rules-dialog button:hover:not(:disabled) { border-color:var(--muted); background:var(--bg); }
+.rules-dialog button:disabled { opacity:.5; cursor:default; }
+.rules-dialog button:focus-visible, .rules-dialog [tabindex]:focus-visible { outline:2px solid var(--tool); outline-offset:2px; }
+.rules-header { display:flex; flex-wrap:nowrap; align-items:center; gap:16px; margin:0; padding:18px 22px; border-bottom:1px solid var(--line); flex:none; }
+.rules-heading { flex:1; }
+.rules-heading h2 { font-size:19px; margin:0 0 5px; }
+.rules-team { color:var(--muted); font-size:12px; overflow-wrap:anywhere; margin:0; max-height:72px; overflow:auto; }
+.rules-local { font-size:12px; white-space:nowrap; color:var(--muted); }
+.rules-close { flex:none; }
+.rules-shell { flex:1; min-height:0; display:grid; grid-template-columns:248px minmax(0,1fr); }
+.rules-sidebar { padding:16px; overflow:auto; overscroll-behavior:contain; border-right:1px solid var(--line); background:var(--bg); }
+.rules-list-tools { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+.rules-count { display:block; color:var(--muted); font-size:11px; }
+.rules-file-group { margin-bottom:20px; }
+.rules-file-group h3 { margin:0 0 8px; font-size:12px; font-weight:600; color:var(--muted); overflow-wrap:anywhere; }
+.rules-dialog .rules-file { width:100%; display:grid; grid-template-columns:16px minmax(0,1fr); align-items:start; gap:5px 8px; margin-bottom:7px; padding:10px 9px; text-align:left; }
+.rules-file[aria-current=true] { border:2px solid var(--ink); padding:9px 8px; }
+.rules-file-path { overflow-wrap:anywhere; }
+.rules-file small { grid-column:2; font-size:11px; color:var(--muted); overflow-wrap:anywhere; }
+.rules-reader { margin:0; padding:18px 26px 28px; min-height:0; overflow:auto; overscroll-behavior:contain; }
+.rules-reader-tools { display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; align-items:center; margin-bottom:18px; }
+.rules-modes { display:flex; gap:4px; }
+.rules-modes [aria-pressed=true] { box-shadow:inset 0 -3px var(--ink); font-weight:600; }
+.rules-dialog .rules-back { display:none; }
+.rules-path { margin:0 0 6px; font-size:16px; line-height:1.5; overflow-wrap:anywhere; }
+.rules-meta { margin:0 0 22px; font-size:12px; color:var(--muted); overflow-wrap:anywhere; }
+.rules-body { max-width:72ch; margin:0 auto; font-size:15px; line-height:1.7; overflow-wrap:anywhere; }
+.rules-body h1, .rules-body h2, .rules-body h3, .rules-body h4, .rules-body h5, .rules-body h6 { display:block; margin:1.3em 0 .6em; font-family:inherit; font-weight:650; letter-spacing:normal; line-height:1.4; text-transform:none; color:var(--ink); }
+.rules-body h1 { font-size:24px; }
+.rules-body h2 { font-size:21px; }
+.rules-body h3 { font-size:19px; }
+.rules-body h4, .rules-body h5, .rules-body h6 { font-size:17px; }
+.rules-body p { margin:.7em 0 1em; white-space:pre-wrap; }
+.rules-body ul, .rules-body ol { margin:.7em 0; padding-left:1.6em; }
+.rules-body li { margin:.35em 0; }
+.rules-body pre { margin:1em 0; padding:14px; overflow:auto; max-width:100%; border:1px solid var(--line); border-radius:6px; background:var(--bg); white-space:pre; font:13px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace; }
+.rules-body code { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.9em; }
+.rules-body :not(pre) > code { background:var(--bg); padding:1px 4px; border:1px solid var(--line); border-radius:3px; }
+.rules-body .rules-raw { white-space:pre-wrap; overflow-wrap:anywhere; }
+.rules-body blockquote { margin:1em 0; padding:0 0 0 16px; border-left:3px solid var(--line); color:var(--muted); }
+.rules-body hr { border:0; border-top:1px solid var(--line); margin:1.5em 0; }
+.rules-link-disabled { text-decoration:underline dotted; text-underline-offset:3px; }
+.rules-image-disabled { font-size:.92em; color:var(--muted); }
+.rules-notice, .rules-warning { font-size:13px; line-height:1.7; overflow-wrap:anywhere; }
+.rules-notice { color:var(--muted); }
+.rules-warning { padding:9px; border:1px dashed var(--muted); border-radius:5px; }
+.rules-status { flex:none; margin:0; min-height:38px; max-height:88px; overflow:auto; padding:10px 22px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+@media (min-width:761px) and (max-width:1023px) {
+  .rules-dialog { width:calc(100vw - 32px); height:calc(100dvh - 32px); }
+  .rules-shell { grid-template-columns:216px minmax(0,1fr); }
+  .rules-reader { padding-inline:18px; }
+}
+@media (max-width:760px) {
+  .rules-dialog { width:100%; height:100dvh; margin:0; border:0; border-radius:0; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .rules-header { display:grid; grid-template-columns:minmax(0,1fr) auto; padding:12px 14px; gap:8px 10px; }
+  .rules-heading h2 { font-size:18px; }
+  .rules-local { grid-column:1; font-size:11px; }
+  .rules-close { grid-column:2; grid-row:1 / span 2; }
+  .rules-shell { grid-template-columns:minmax(0,1fr); }
+  .rules-sidebar { border-right:0; }
+  .rules-reader { padding:14px 16px 24px; }
+  .rules-dialog[data-pane=list] .rules-reader, .rules-dialog[data-pane=document] .rules-sidebar { display:none; }
+  .rules-dialog .rules-back { display:block; }
+  .rules-reader-tools { justify-content:flex-start; }
+  .rules-reader-tools > :last-child { margin-left:auto; }
+  .rules-body { font-size:14px; }
+  .rules-status { padding-inline:14px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .rules-dialog, .rules-dialog * { animation:none!important; transition:none!important; }
+}

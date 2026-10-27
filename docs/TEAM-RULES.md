@@ -20,3 +20,11 @@ An optional local workspace map entry can add `rules.extraFiles` (exact relative
 - Limits: at most 32 directory candidates, eight roots, 128 files, 512 entries per inspected directory, four helper processes, three-second helper timeout and per-team list rate limiting. Excess/inaccessible scope is reported rather than silently claimed complete.
 
 Neither scope metadata, lists nor documents are part of `/events` or `/api/sessions`. The Cloudflare viewer's API/static allowlists do not expose this reader. Tests use synthetic repositories, malicious links and an explicit directory-swap race; no real team rules are included.
+
+## Reading in a team room
+
+Open a registered team's local room, then select **团队守则**. Page load checks only capability: opening the dialog lists metadata, and selecting a file reads exactly that document. Desktop uses a file sidebar and reader; mobile switches between list and document. Escape returns focus to the entry, and closing/navigation cancels requests and clears content. There is no prefetch, persistent browser storage, editing or agent instruction injection.
+
+Markdown is a deliberately limited DOM-only dialect: headings, paragraphs, lists, quotes, code and emphasis. Raw HTML remains text; all images and links are inert, including local/data URLs. Unsupported syntax stays readable as text, and an original-text toggle is available. No external parser, image, font, preview or code execution is used.
+
+The entry is absent from non-local hostnames, ungrouped/global views and PiP. A missing capability fails closed. `npm run test:rules-ui` checks synthetic hostile content, delayed-response cancellation, keyboard/mobile layouts and an actual helper/server/browser round trip. Set `WMAD_RULES_SCREENSHOTS` to a local output directory for synthetic screenshots only.
