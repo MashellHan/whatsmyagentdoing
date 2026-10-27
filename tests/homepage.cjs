@@ -21,6 +21,12 @@ test('explicit Herdr fallback is preserved only when the backend marked it unmat
   assert.equal(a.busy, 1); assert.equal(a.logs, 1); assert.equal(a.fallback, 1);
   assert.equal(activityOf([{ ...log('done'), source: 'herdr', sourceStatus: 'unknown' }]).kind, 'idle', 'explicit log provenance wins');
 });
+test('busy, attention and unknown counts coexist without changing log-first classification', () => {
+  const a = activityOf([log('tool'), log('waiting'), log('error'), log('unrecognized'), log('done')]);
+  assert.equal(a.kind, 'busy');
+  assert.equal(a.busy, 1); assert.equal(a.attention, 2); assert.equal(a.unknown, 1);
+  assert.equal(a.resting, 1); assert.equal(a.total, 5);
+});
 test('top counts actual teams separately from ungrouped, and includes all working agents', () => {
   const snapshot = { teams: ['w1', 'w2', 'w3', 'w4', 'ungrouped'].map(id => ({ id })), sessions: [
     { ...log('tool'), teamId: 'w1' }, { ...log('done'), teamId: 'w2' }, { ...log('idle'), teamId: 'w2' },

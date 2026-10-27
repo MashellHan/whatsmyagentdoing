@@ -16,24 +16,27 @@
   </header>
   <main>
     <section id="town-view" aria-labelledby="town-title">
-      <div class="intro"><div><p class="eyebrow">A NEIGHBORHOOD OF TEAMS</p><h1 id="town-title">沿着小路，看看大家<span>。</span></h1><p class="intro-copy">灯亮时，任务正在进行；灯暗时，整个团队正闲着。<br>走进任一小屋，打开原版办公室。</p></div>
-        <div class="overview" aria-label="团队活动总览"><span id="summary-freshness" class="summary-freshness">正在读取状态…</span><div class="town-stats"><div><strong id="busy-team-count">—</strong><span><i class="stat-dot busy"></i>团队在忙</span></div><div><strong id="idle-team-count">—</strong><span><i class="stat-dot idle"></i>团队全闲</span></div><div><strong id="working-count">—</strong><span>正在工作的 agent</span></div></div><p id="overview-note">等待本机快照</p></div>
+      <div class="intro"><div><p class="eyebrow">A NEIGHBORHOOD OF TEAMS</p><h1 id="town-title">沿着小路，看看大家<span>。</span></h1><p class="intro-copy">烟囱冒烟，大家在忙；合帘猫眠，团队全闲。<br>点击小屋，进入原版办公室。</p></div>
+        <div class="overview" aria-label="团队活动总览"><span id="summary-freshness" class="summary-freshness">正在读取状态…</span><div class="town-stats"><div><strong id="busy-team-count">—</strong><span><i class="stat-symbol" aria-hidden="true">↻</i>团队在忙</span></div><div><strong id="idle-team-count">—</strong><span><i class="stat-symbol" aria-hidden="true">Zzz</i>团队全闲</span></div><div><strong id="working-count">—</strong><span>正在工作的 agent</span></div></div><p id="overview-note">等待本机快照</p></div>
       </div>
       <div class="town-map">
         <div class="map-caption"><span>⌖ LOCAL · 团队街区</span><span id="map-note">NEIGHBORHOOD MAP <i>↑ N</i></span></div>
         <div id="neighborhood" class="neighborhood">
           <div class="streets" aria-hidden="true"><div class="avenue"><span>TEAM LANE</span></div><div class="plaza"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#e9e0c8" stroke="#c1b697" stroke-width="2"/><circle cx="50" cy="50" r="29" fill="#b3cbbd" stroke="#8eae9d" stroke-width="5"/><ellipse cx="50" cy="54" rx="19" ry="11" fill="none" stroke="#dce8d9" stroke-width="2"/><path d="M50 61V33m0 0c-11-9-15 1-15 7m15-7c11-9 15 1 15 7" fill="none" stroke="#edf1df" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="62" r="6" fill="#91ada0"/></svg><span>小镇广场</span></div></div>
           <div id="houses" class="houses" aria-label="团队房屋"></div>
-          <div class="street-decor" aria-hidden="true"><i class="street-tree tree-west"></i><i class="street-tree tree-east"></i><i class="street-lamp lamp-west"></i><i class="street-lamp lamp-east"></i><i class="street-bench"></i><span class="street-label">花园街 · GARDEN WALK</span></div>
+          <div class="street-decor" aria-hidden="true"><i class="street-tree tree-west"></i><i class="street-tree tree-east"></i><i class="street-lamp lamp-west"></i><i class="street-lamp lamp-east"></i><i class="street-bench"></i></div>
+          <div class="green-borders" aria-hidden="true"><i class="hedge hedge-north"></i></div>
         </div>
         <div id="empty" class="empty" hidden>还没有小屋。请确认服务从 Herdr pane 启动，稍后将自动重试。</div>
         <div class="map-footer"><span>点击房子 → 办公室 / 列表 / 画中画</span><span>只观察，不打扰</span></div>
       </div>
     </section>
     <div id="source-warning" class="source-warning" role="status" hidden></div>
-    <div class="legend" aria-label="团队状态图例"><span><i data-status="busy"></i>忙碌中 · 灯亮</span><span><i data-status="idle"></i>整体闲着 · 灯暗</span><span><i data-status="attention"></i>等待处理</span><span><i data-status="unknown"></i>状态未明</span></div>
+    <div class="legend" aria-label="团队状态图例"><span><i aria-hidden="true">↻</i>忙碌中 · 冒烟 / 飘旗</span><span><i aria-hidden="true">Zzz</i>整体闲着 · 合帘 / 猫眠</span><span><i aria-hidden="true">!</i>等待处理</span><span><i aria-hidden="true">?</i>状态未明</span><span><i aria-hidden="true">—</i>暂未入住</span></div>
+    <div class="motion-controls"><button id="motion-toggle" type="button" aria-label="小镇动效暂停开关" aria-pressed="false">暂停小镇动效</button><span id="motion-reason"></span></div>
+    <p class="motion-note">配色只标识房屋；状态同时用符号和文字显示。</p>
     <p class="counting-note">忙碌 = 思考 / 执行 / 回复；全闲 = 所有成员均闲置、完成或中断。等待处理、未知和空屋不计全闲。未分组不计团队数，计入 agent 总数。</p>
   </main>
-  <footer class="site-footer"><span>状态来自原版会话日志；无法关联时回退 Herdr。只读，无自动更新。</span><span>127.0.0.1 ONLY <b>·</b> READ ONLY <b>·</b> NO PROMPTS</span></footer>
+  <footer class="site-footer"><span>状态来自原版会话日志；无法关联时回退 Herdr。只读观察；状态自动同步，无自动操作。</span><span>127.0.0.1 ONLY <b>·</b> READ ONLY <b>·</b> NO PROMPTS</span></footer>
 </body>
 </html>
