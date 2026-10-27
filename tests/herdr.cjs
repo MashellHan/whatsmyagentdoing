@@ -113,3 +113,12 @@ test('configured dev/designer roles require exact pane and expected name without
   f.data.agents[2].name = 'replacement'; await f.w.tick();
   assert.equal(f.w.sessions()[2].role, 'member');
 });
+
+test('rule directory candidates remain private and stop being available when identity is stale', async () => {
+  const f = fixture(); await f.w.tick();
+  assert.deepEqual(f.w.ruleContext('w1').directories, ['/same/workspace']);
+  assert.equal(f.w.ruleContext('unknown'), null);
+  assert.equal(JSON.stringify(snapshot(f.w)).includes('/same/workspace'), false);
+  assert.equal(JSON.stringify(snapshot(f.w)).includes('ruleDirectories'), false);
+  f.fail(true); await f.w.tick(); assert.equal(f.w.ruleContext('w1'), null);
+});

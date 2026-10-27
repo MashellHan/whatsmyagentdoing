@@ -30,6 +30,7 @@ class HerdrWatcher extends EventEmitter {
     this.now = now;
     this.members = [];
     this.houses = [];
+    this.ruleDirectories = new Map(); // private only: never part of teams()/sessions()
     this.health = { kind: 'herdr', scope: 'current-herdr-session', presence: 'connecting', error: null };
     this.pending = null;
     this.stopped = false;
@@ -37,6 +38,11 @@ class HerdrWatcher extends EventEmitter {
   sessions() { return this.members; }
   teams() { return this.houses; }
   sourceInfo() { return this.health; }
+  ruleContext(teamId) {
+    if (this.health.presence !== 'fresh' || !this.houses.some(team => team.id === teamId)) return null;
+    const rules = this.teamMap.workspaces?.[teamId]?.rules || {};
+    return { directories: this.ruleDirectories.get(teamId) || [], extraFiles: rules.extraFiles || [], roots: rules.roots || [] };
+  }
   start() {
     if (this.timer) return this;
     this.stopped = false;
@@ -73,6 +79,13 @@ class HerdrWatcher extends EventEmitter {
       const workspaces = rows(workspaceJSON, 'workspaces');
       const agents = rows(agentJSON, 'agents');
       if (this.stopped) return;
+      const directories = new Map(workspaces.map(w => [w.workspace_id, [text(w.cwd)].filter(Boolean)]));
+      for (const a of agents) {
+        if (!directories.has(a.workspace_id)) directories.set(a.workspace_id, []);
+        const cwd = text(a.foreground_cwd) || text(a.cwd);
+        if (cwd && !directories.get(a.workspace_id).includes(cwd)) directories.get(a.workspace_id).push(cwd);
+      }
+      this.ruleDirectories = directories;
       const now = this.now();
       const previous = new Map(this.members.map(s => [s.key, s]));
       const houses = new Map(workspaces.map(w => [w.workspace_id, {

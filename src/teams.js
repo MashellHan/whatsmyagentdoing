@@ -72,6 +72,7 @@ class TeamWatcher extends EventEmitter {
     return teams;
   }
   sourceInfo() { return { ...this.herdr.sourceInfo(), kind: 'logs+herdr', statusPolicy: 'log-first-exact-session', logInterval: 1000 }; }
+  ruleContext(teamId) { return this.herdr.ruleContext(teamId); }
 }
 
 module.exports = { TeamWatcher, joinSessions };
