@@ -207,6 +207,7 @@
       this.first = true;
       this.visible = true;
       this.hit = [];
+      this.labelHits = [];
       this.hoverKey = null;
       this.t = performance.now();
       this.pal = palette(lightTheme);
@@ -667,9 +668,14 @@
       const r = this.canvas.getBoundingClientRect();
       const mx = e.clientX - r.left, my = e.clientY - r.top;
       let found = null;
-      for (let i = this.hit.length - 1; i >= 0; i--) {
-        const h = this.hit[i];
-        if (mx >= h.x0 && mx <= h.x1 && my >= h.y0 && my <= h.y1) { found = h; break; }
+      // Labels can be moved away from their owner to stay inside the viewport.
+      // Last-painted labels win over other labels, then over any body beneath.
+      for (const hits of [this.labelHits, this.hit]) {
+        for (let i = hits.length - 1; i >= 0; i--) {
+          const h = hits[i];
+          if (mx >= h.x0 && mx <= h.x1 && my >= h.y0 && my <= h.y1) { found = h; break; }
+        }
+        if (found) break;
       }
       const key = found ? found.key : null;
       this.canvas.style.cursor = key ? 'pointer' : 'default';
@@ -1354,19 +1360,42 @@
       return { x, y: headTop, act: st.act };
     }
 
+    get labelScale() {
+      const view = this.root.ownerDocument.defaultView;
+      if (view.innerWidth < 1200 || this.root.ownerDocument.body.classList.contains('pip')) return 1;
+      // Actual content width, not screen pixels, member count or camera zoom.
+      return clamp(1.2 + (this.cw - 1100) * .0004, 1.2, 1.6);
+    }
+
+    recordLabelHit(key, x, y, w, h, kind) {
+      const t = this.ctx.getTransform();
+      const points = [[x,y],[x+w,y],[x,y+h],[x+w,y+h]].map(([px,py]) => ({
+        x:(t.a*px+t.c*py+t.e)/this.dpr, y:(t.b*px+t.d*py+t.f)/this.dpr,
+      }));
+      this.labelHits.push({key,kind,x0:Math.min(...points.map(p=>p.x)),x1:Math.max(...points.map(p=>p.x)),
+        y0:Math.min(...points.map(p=>p.y)),y1:Math.max(...points.map(p=>p.y))});
+    }
+
     bubble(p, at) {
       const c = this.ctx;
       const t = this.t / 1000;
       const s = p.s || {};
       const st = s.status;
       const pal = this.pal;
-      // Small PiP canvases can fit the model but leave a screen-space name pill
-      // just above the top edge. Keep the whole original label group in bounds;
-      // its text size and the room's projection are not reduced to make it fit.
       const screen = this.screenLabels || !!this.gl;
-      const x = screen ? clamp(at.x, Math.min(84,this.cw/2), Math.max(this.cw-84,this.cw/2)) : at.x;
-      const y = screen ? Math.max(52,at.y-6) : at.y-6;
+      const scale = screen ? this.labelScale : 1;
+      let x = at.x, y = at.y-6;
       c.save();
+      if (screen) {
+        // 84/52 bound the widest name+badge and tallest activity+name stack in
+        // base drawing units. Scale the whole group, including margins and gap.
+        const edge = 84*scale;
+        const anchorX = clamp(at.x,Math.min(edge,this.cw/2),Math.max(this.cw-edge,this.cw/2));
+        const anchorY = clamp(at.y-6*scale,52*scale,Math.max(52*scale,this.ch-4));
+        c.translate(anchorX,anchorY);
+        c.scale(scale,scale);
+        x = y = 0;
+      }
       c.textAlign = 'center';
       c.textBaseline = 'middle';
       const font = (w, px) => `${w} ${px}px ui-sans-serif, system-ui, -apple-system, "PingFang TC", "Apple Color Emoji", sans-serif`;
@@ -1381,6 +1410,7 @@
         const w = c.measureText(tx).width + 12 + extra;
         const height = extra ? 22 : 16;
         this.roundRect(x - w / 2, yy - height / 2, w, height, 8, bg);
+        this.recordLabelHit(p.key,x-w/2,yy-height/2,w,height,identify ? 'name' : 'activity');
         c.fillStyle = fg;
         c.fillText(tx, x + extra / 2, yy + 0.5);
         if (extra) this.agentBadge(badge, x - w / 2 + 13, yy);
@@ -1464,6 +1494,7 @@
         pill(this.label(s), pal.text, pal.tagBg, top - 11, p.mode === 'work' || hover ? 1 : 0.7, true);
       } else if (badge) {
         this.agentBadge(badge, x, top - 11);
+        this.recordLabelHit(p.key,x-9,top-20,18,18,'badge');
       }
       c.restore();
     }
@@ -1555,6 +1586,7 @@
     // ------------------------------------------------------------ frame
 
     frame(now) {
+      this.labelHits = [];
       const dt = Math.min(0.05, (now - this.last) / 1000);
       this.last = now;
       this.t = this.reducedMotion ? 0 : now;
