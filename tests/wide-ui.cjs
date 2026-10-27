@@ -63,17 +63,22 @@ async function metrics(page) {
       for(const x of [0,o.plan.W])for(const y of [0,o.plan.D])for(const z of [0,2.4])corners.push(project(o.iso(x,y,z)));
       room=dims(bounds(corners));
     }
-    const labels=[], bubble=o.bubble, roundRect=o.roundRect;
+    const labels=[], fontPixels=[], badgePixels=[], bubble=o.bubble, roundRect=o.roundRect, fillText=o.ctx.fillText, agentBadge=o.agentBadge;
     let labelKey=null;
     o.bubble=function(p,at){labelKey=p.key;const r=bubble.call(this,p,at);labelKey=null;return r;};
     o.roundRect=function(x,y,w,h,...args){
-      if(labelKey){const t=this.ctx.getTransform();const pts=[[x,y],[x+w,y],[x,y+h],[x+w,y+h]].map(([x,y])=>({x:(t.a*x+t.c*y+t.e)/this.dpr,y:(t.b*x+t.d*y+t.f)/this.dpr}));labels.push(bounds(pts));}
+      if(labelKey){const t=this.ctx.getTransform();const pts=[[x,y],[x+w,y],[x,y+h],[x+w,y+h]].map(([x,y])=>({x:(t.a*x+t.c*y+t.e)/this.dpr,y:(t.b*x+t.d*y+t.f)/this.dpr}));labels.push({...bounds(pts),key:labelKey});}
       return roundRect.call(this,x,y,w,h,...args);
     };
-    o.frame(performance.now()); o.bubble=bubble; o.roundRect=roundRect;
+    o.ctx.fillText=function(text,...args){
+      if(labelKey&&String(text).includes('Member')){const t=this.getTransform();fontPixels.push(parseFloat(this.font.match(/[\d.]+px/)[0])*Math.hypot(t.c,t.d)/o.dpr);}
+      return fillText.call(this,text,...args);
+    };
+    o.agentBadge=function(...args){const t=this.ctx.getTransform();badgePixels.push(18*Math.hypot(t.a,t.b)/this.dpr);return agentBadge.apply(this,args);};
+    o.frame(performance.now()); o.bubble=bubble; o.roundRect=roundRect; o.ctx.fillText=fillText; o.agentBadge=agentBadge;
     const c=o.canvas, box=c.getBoundingClientRect(), root=o.root.getBoundingClientRect();
     return {viewport:innerWidth,quality:officeKind,plan:[o.plan.W,o.plan.D],cw:o.cw,ch:o.ch,zoom:o.gl?o.camera.zoom:o.cam.zoom,
-      person,desk,room,geometry,labels,css:[box.width,box.height],buffer:[c.width,c.height],dpr:o.dpr,
+      person,desk,room,geometry,labels,labelHits:o.labelHits,labelScale:o.labelScale,nameFontPx:Math.max(...fontPixels),badgePx:Math.max(...badgePixels),css:[box.width,box.height],buffer:[c.width,c.height],dpr:o.dpr,
       root:[root.width,root.height],gl:o.gl?{css:[o.gl.domElement.getBoundingClientRect().width,o.gl.domElement.getBoundingClientRect().height],buffer:[o.gl.domElement.width,o.gl.domElement.height]}:null,
       overflow:document.documentElement.scrollWidth>innerWidth, gutter:document.querySelector('.wrap').getBoundingClientRect().left};
   });
@@ -92,6 +97,47 @@ function assertContained(m, name) {
   assert.deepEqual(m.css,[m.cw,m.ch]);
   assert.ok(Math.abs(m.buffer[0]-m.cw*m.dpr)<=1&&Math.abs(m.buffer[1]-m.ch*m.dpr)<=1,`${name} backing DPR`);
   if(m.gl) assert.deepEqual(m.gl.css,m.css,`${name} GL/overlay CSS coordinates`);
+  assert.ok(Math.abs(m.nameFontPx-10*m.labelScale)<.01,`${name} effective name font scales as a group`);
+  assert.ok(Math.abs(m.badgePx-18*m.labelScale)<.01,`${name} provider badge scales with the text`);
+  for(const b of m.labels) {
+    assert.ok(m.labelHits.some(h=>h.key===b.key&&Math.abs(h.x0-b.left)<.01&&Math.abs(h.x1-b.right)<.01&&Math.abs(h.y0-b.top)<.01&&Math.abs(h.y1-b.bottom)<.01),`${name} rendered label has an exact CSS hit rectangle`);
+  }
+}
+async function assertLabelPicking(page, name) {
+  const result=await page.evaluate(()=>{
+    const o=office;
+    o.frame(performance.now());
+    const length=o.labelHits.length;
+    o.frame(performance.now());
+    const errors=[];
+    if(o.labelHits.length!==length)errors.push('label hits accumulated across frames');
+    const hit=o.labelHits.findLast(h=>h.kind==='name');
+    if(!hit)return ['no owner name hit'];
+    const originalHover=o.onHover, bodies=o.hit;
+    let clicked;
+    o.onHover=(s,at,click)=>{if(click)clicked=s?.key;};
+    // Force a different body beneath the real visible name to prove label priority.
+    o.hit=[{...hit,key:hit.key==='wide-0'?'wide-1':'wide-0'}];
+    const r=o.canvas.getBoundingClientRect();
+    o.canvas.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:r.left+(hit.x0+hit.x1)/2,clientY:r.top+(hit.y0+hit.y1)/2}));
+    if(clicked!==hit.key)errors.push(`name picked ${clicked}, expected ${hit.key}`);
+    // Move one real owner label to the upper-left through the production bubble
+    // function. This exercises the scaled clamp and its recorded screen rectangle.
+    o.labelHits=[];
+    o.ctx.save();o.ctx.setTransform(o.dpr,0,0,o.dpr,0,0);
+    o.bubble(o.people.get('wide-0'),{x:0,y:0,act:'type'});
+    o.ctx.restore();
+    const moved=o.labelHits.findLast(h=>h.kind==='name');
+    if(!moved||moved.x0<0||moved.y0<0||moved.x1>o.cw||moved.y1>o.ch)errors.push('shifted/scaled label clipped');
+    if(moved){
+      o.hit=[{...moved,key:'wide-1'}];clicked=undefined;
+      o.canvas.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:r.left+(moved.x0+moved.x1)/2,clientY:r.top+(moved.y0+moved.y1)/2}));
+      if(clicked!=='wide-0')errors.push('shifted name selected the body below it');
+    }
+    o.onHover=originalHover;o.hit=bodies;o.hoverKey=null;o.frame(performance.now());
+    return errors;
+  });
+  assert.deepEqual(result,[],name);
 }
 (async()=>{
   const server=createServer(source);
@@ -124,6 +170,7 @@ function assertContained(m, name) {
         // Legacy camera eases towards its target; baseline gets the same settled view.
         await page.evaluate(()=>{for(let i=0;i<100;i++)office.fitCamera?.();});
         measured[quality].push(await metrics(page));
+        await assertLabelPicking(page,`${quality} ${width} label picking`);
       }
     }
     for(const kind of ['town','mid','high']) {
@@ -134,6 +181,8 @@ function assertContained(m, name) {
           assert.ok(list[i].person.height>list[i-1].person.height*1.25,`${kind} actual person grows`);
           assert.ok(list[i].desk.width>list[i-1].desk.width*1.25,`${kind} actual furniture grows`);
           assert.deepEqual(list[i].plan,list[0].plan,'viewport does not create a different floor plan');
+          assert.ok(list[i].labelScale>list[i-1].labelScale,`${kind} label scale grows with actual canvas`);
+          assert.ok(list[i].nameFontPx>list[i-1].nameFontPx,`${kind} name text grows in CSS pixels`);
         }
       }
     }
@@ -144,6 +193,7 @@ function assertContained(m, name) {
       assertContained(m,`${kind} ${m.viewport}`);
       assert.ok(m.room.width/m.cw>=.88&&m.room.width/m.cw<=.96,'room fills width without crop');
       assert.equal(m.gutter,m.viewport>=2240?40:32);
+      assert.ok(m.labelScale>=1.2&&m.labelScale<=1.6);
     }
     assert.ok(Math.abs(measured.mid[2].ch-measured.high[2].ch)<=1,'quality shares one stage');
     // The large canvas is a real, scroll-accessible element; the wheel is not
@@ -173,9 +223,11 @@ function assertContained(m, name) {
     const pipResults=[];
     for(const quality of ['mid','high']) {
       await child.locator(`#qualSeg [data-v=${quality}]`).click(); await ready(child);
-      for(const [width,height] of [[320,240],[480,400],[640,480],[960,600]]) {
+      for(const [width,height] of [[320,240],[480,400],[640,480],[960,600],[1280,720]]) {
         await pip.setViewportSize({width,height}); await settle(child);
         const m=await metrics(child); assertContained(m,`PiP ${quality} ${width}`); pipResults.push({quality,width,height,canvas:[m.cw,m.ch]});
+        assert.equal(m.labelScale,1,'PiP preserves original label size');
+        await assertLabelPicking(child,`PiP ${quality} ${width} name picking`);
         assert.ok(m.ch<height&&m.cw<=width);
         assert.equal(await child.locator('#stageScale').isVisible(),false);
         assert.equal(await child.locator('#teamRoster').isVisible(),false);
@@ -209,6 +261,8 @@ function assertContained(m, name) {
       for(const width of [1199,900,390,320]) {
         await page.setViewportSize({width,height:width===320?568:844});await settle(page);
         const m=await metrics(page);assertContained(m,`small ${quality} ${width}`);
+        assert.equal(m.labelScale,1,'small viewports preserve original label size');
+        await assertLabelPicking(page,`small ${quality} ${width} name picking`);
         assert.ok(m.ch<850);
         assert.equal(await page.locator('#teamRoster').evaluate(n=>n.getBoundingClientRect().top>=document.querySelector('#office').getBoundingClientRect().bottom),true);
       }
@@ -233,13 +287,15 @@ function assertContained(m, name) {
     });
     const all=await retina.newPage();await all.goto(`${base}/office?quality=mid`);await ready(all);
     const all2d=await metrics(all);assertContained(all2d,'all-office retina');assert.ok(all2d.cw>2400);
+    await assertLabelPicking(all,'DPR2 2D label picking');
     await tagDesks(all);await all.locator('#qualSeg [data-v=high]').click();await ready(all);
     const all3d=await metrics(all);assertContained(all3d,'all-office 3D retina');
+    await assertLabelPicking(all,'DPR2 3D label picking');
     assert.ok(all3d.gl.buffer[0]*all3d.gl.buffer[1]<=12010000,'GL pixel budget');
     await retina.close();
-    const compact = list => list.map(m=>({viewport:m.viewport,canvas:[m.cw,m.ch],personHeight:+m.person.height.toFixed(2),deskWidth:+m.desk.width.toFixed(2),roomWidth:+m.room.width.toFixed(2),zoom:+m.zoom.toFixed(3)}));
+    const compact = list => list.map(m=>({viewport:m.viewport,canvas:[m.cw,m.ch],personHeight:+m.person.height.toFixed(2),deskWidth:+m.desk.width.toFixed(2),roomWidth:+m.room.width.toFixed(2),zoom:+m.zoom.toFixed(3),labelScale:+m.labelScale.toFixed(3),nameFontPx:+m.nameFontPx.toFixed(2),badgePx:+m.badgePx.toFixed(2)}));
     console.log(JSON.stringify({baseline:round4Baseline,town:measured.town,mid:compact(measured.mid),high:compact(measured.high),pip:pipResults},null,2));
     assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
-    console.log('PASS wide: actual SVG/person/furniture growth; room + mesh + labels contained; natural scroll + fit; stable buffers; mobile + real PiP + video; plan growth; DPR2 and pixel budget');
+    console.log('PASS wide: actual SVG/person/furniture growth; scaled text/badges/bubbles + exact label picking; room + mesh + labels contained; natural scroll + fit; stable buffers; mobile + real PiP + video; plan growth; DPR2 and pixel budget');
   } finally {await browser?.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
