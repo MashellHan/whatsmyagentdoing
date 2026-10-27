@@ -1,0 +1,19 @@
+{
+  // Phone viewer. Must sit behind a hostname-based Cloudflare Access app;
+  // the Worker also verifies the Access JWT and the exact allowed email.
+  "name": "agent-town",
+  "account_id": "e369b6206bd9481c027e1974c45756a2",
+  "main": "viewer/worker.mjs",
+  "compatibility_date": "2026-09-19",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": true, "html_handling": "none", "not_found_handling": "none" },
+  "durable_objects": { "bindings": [{ "name": "TOWN", "class_name": "TownState", "script_name": "agent-town-ingest" }] },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "VIEWER_HOST": "agent-town.mxhan.workers.dev",
+    "ALLOWED_VIEWER_EMAIL": "mxhan@outlook.com",
+    "ACCESS_TEAM_URL": "https://falling-wind-d3fc.cloudflareaccess.com",
+    "ACCESS_AUD": "8ac30a0ab395acd9f07635e18cd1452d456fa2b8769f004fd9c36c0e83f8582a"
+  }
+}

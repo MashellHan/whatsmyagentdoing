@@ -1,0 +1,13 @@
+{
+  // Push target for mini-1. Not behind Access: only POST /ingest and
+  // GET /ingest/check with the PUSH_TOKEN bearer secret; everything else 404.
+  "name": "agent-town-ingest",
+  "account_id": "e369b6206bd9481c027e1974c45756a2",
+  "main": "ingest/worker.mjs",
+  "compatibility_date": "2026-09-19",
+  "workers_dev": true,
+  "preview_urls": false,
+  "durable_objects": { "bindings": [{ "name": "TOWN", "class_name": "TownState" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TownState"] }],
+  "observability": { "enabled": true, "head_sampling_rate": 1 }
+}
