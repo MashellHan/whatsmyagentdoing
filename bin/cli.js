@@ -1,10 +1,17 @@
 #!/usr/bin/env node
 'use strict';
 
+// This local team dashboard never phones home or updates the checkout.
+process.env.WMAD_NO_UPDATE_CHECK = '1';
+
 const http = require('http');
 const { spawn } = require('child_process');
 const { Watcher, CLAUDE_DIR, CODEX_DIR, GEMINI_DIR } = require('../src/watcher');
 const { DemoWatcher } = require('../src/demo');
+const { HerdrWatcher } = require('../src/herdr');
+const { TeamWatcher } = require('../src/teams');
+const fs = require('fs');
+const path = require('path');
 const scenes = require('../src/scenes');
 const updater = require('../src/update');
 const { createServer, snapshot } = require('../src/server');
@@ -16,27 +23,28 @@ See what every Claude Code, Codex and Gemini CLI agent on this machine is doing,
 Usage: node bin/cli.js [options]   (or /myoffice as a skill)
 
 Options:
-  -p, --port <n>    Port to serve on (default 4545)
+  -p, --port <n>    Port to serve on (default 4546)
   --hours <n>       Show sessions active in the last n hours (default 24)
   --no-open         Don't open the browser
-  --private         Hide prompts, replies and titles; show status only
+  --private         Hide prompts, replies and titles (always enabled)
+  --logs            Read local logs instead of Herdr; show an ungrouped house
+  --team-map <file>  Explicit leader map (default config/team-houses.json)
   --json            Print one snapshot as JSON and exit
   --demo            Show a made-up team instead of your sessions
   --stop            Stop a running dashboard
-  --update          Update to the latest version (git pull) and restart a running dashboard
-  --scenes          List 3D scenes (installed and downloadable)
-  --scene <id>      Download a scene if needed and open the office in it
-  --remove-scene <id>  Delete a downloaded scene
+  --scenes          List already installed 3D scenes
+  --scene <id>      Open the legacy office with an already installed scene
   -h, --help        Show this help
 
-Reads (never writes):
+Default: Herdr team identity + exact session log status (read only).
+--logs reads logs without Herdr grouping. Log locations:
   ${CLAUDE_DIR}
   ${CODEX_DIR}
   ${GEMINI_DIR}
 Override with CLAUDE_CONFIG_DIR / CODEX_HOME / GEMINI_CLI_HOME.`;
 
 function parseArgs(argv) {
-  const o = { port: 4545, hours: 24, open: true, privacy: false, json: false, demo: false, stop: false, scenes: false, scene: null, removeScene: null, update: false };
+  const o = { port: 4546, hours: 24, open: true, privacy: true, logs: false, teamMap: path.join(__dirname, '../config/team-houses.json'), json: false, demo: false, stop: false, scenes: false, scene: null, removeScene: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '-h' || a === '--help') { console.log(HELP); process.exit(0); }
@@ -47,17 +55,19 @@ function parseArgs(argv) {
     else if (a.startsWith('--hours=')) o.hours = Number(a.slice(8));
     else if (a === '--no-open') o.open = false;
     else if (a === '--private') o.privacy = true;
+    else if (a === '--logs') o.logs = true;
+    else if (a === '--team-map') o.teamMap = argv[++i];
     else if (a === '--json') o.json = true;
     else if (a === '--demo') o.demo = true;
     else if (a === '--stop') o.stop = true;
-    else if (a === '--update') o.update = true;
+    else if (a === '--update') throw new Error('Updates are disabled in this local-only build.');
     else if (a === '--scenes') o.scenes = true;
     else if (a === '--scene') o.scene = argv[++i];
     else if (a.startsWith('--scene=')) o.scene = a.slice(8);
-    else if (a === '--remove-scene') o.removeScene = argv[++i];
+    else if (a === '--remove-scene') throw new Error('Scene mutations are disabled in this read-only build.');
     else { console.error(`Unknown option: ${a}\n\n${HELP}`); process.exit(1); }
   }
-  if (!Number.isFinite(o.port) || !Number.isFinite(o.hours)) { console.error(HELP); process.exit(1); }
+  if (!Number.isInteger(o.port) || o.port < 1024 || o.port > 65535 || !Number.isFinite(o.hours) || o.hours <= 0) { console.error(HELP); process.exit(1); }
   return o;
 }
 
@@ -76,7 +86,7 @@ function alreadyRunning(port) {
     const req = http.get({ host: '127.0.0.1', port, path: '/api/ping', timeout: 800 }, (res) => {
       let body = '';
       res.on('data', (c) => (body += c));
-      res.on('end', () => resolve(body.includes('whatsmyagentdoing')));
+      res.on('end', () => { try { resolve(JSON.parse(body).app === 'agent-office-team-houses'); } catch { resolve(false); } });
     });
     req.on('error', () => resolve(false));
     req.on('timeout', () => { req.destroy(); resolve(false); });
@@ -93,33 +103,8 @@ function stopAt(port) {
   });
 }
 
-// Agents read this line (see SKILL.md) and offer the update.
-async function printUpdateHint() {
-  await updater.checkLatest(true);
-  const i = updater.info();
-  if (i.updateAvailable) {
-    console.log(`Update available: v${i.version} → v${i.latest}. Run with --update (or /myoffice update), or click "Update" on the page.`);
-  }
-}
-
 async function main() {
   const o = parseArgs(process.argv.slice(2));
-
-  if (o.update) {
-    const before = updater.localVersion();
-    try {
-      const after = await updater.update();
-      console.log(after === before ? `Already up to date (v${after}).` : `Updated v${before} → v${after}.`);
-      // a running dashboard keeps the old code until it restarts
-      for (let p = o.port; p <= o.port + 10; p++) {
-        if (await alreadyRunning(p)) { await stopAt(p); console.log(`Restart it with /myoffice (it was on port ${p}).`); }
-      }
-    } catch (e) {
-      console.error(String(e.message || e));
-      process.exit(1);
-    }
-    return;
-  }
 
   if (o.scenes) {
     const have = scenes.installed();
@@ -127,22 +112,12 @@ async function main() {
     console.log('3D scenes (pick one with --scene <id>, or from the scene menu in High 3D):');
     console.log('  office      Office (built in)');
     for (const x of have) console.log(`  ${x.id.padEnd(11)} ${name(x)} (installed)`);
-    for (const x of scenes.catalog().filter((c) => !have.some((h) => h.id === c.id))) {
-      console.log(`  ${x.id.padEnd(11)} ${name(x)} (download, ${Math.max(1, Math.round(x.size / 1024))} KB)`);
-    }
-    return;
-  }
-
-  if (o.removeScene) {
-    console.log(scenes.remove(o.removeScene) ? `Removed ${o.removeScene}.` : `${o.removeScene} isn't a downloaded scene.`);
     return;
   }
 
   if (o.scene && o.scene !== 'office') {
     try {
-      const had = scenes.sceneDir(o.scene);
-      const x = await scenes.install(o.scene);
-      console.log(had ? `Scene ${x.id} is ready.` : `Downloaded scene ${x.id}.`);
+      if (!scenes.sceneDir(o.scene)) throw new Error('Scene downloads are disabled in this local-only build.');
     } catch (e) {
       console.error(String(e.message || e));
       process.exit(1);
@@ -150,63 +125,59 @@ async function main() {
   }
 
   if (o.stop) {
-    // It may have moved to a later port if the default was taken.
-    const ports = [];
-    for (let p = o.port; p <= o.port + 10; p++) if (await alreadyRunning(p)) ports.push(p);
-    for (const p of ports) await stopAt(p);
-    console.log(ports.length ? `Stopped ${ports.map((p) => `http://localhost:${p}`).join(', ')}` : 'Not running.');
+    // Never stop an original instance or scan neighboring ports.
+    const running = await alreadyRunning(o.port);
+    if (running) await stopAt(o.port);
+    console.log(running ? `Stopped http://127.0.0.1:${o.port}` : 'No Team Houses instance on that port.');
     return;
   }
+
+  let teamMap = {};
+  if (!o.demo && !o.logs) {
+    if (process.env.HERDR_ENV !== '1') throw new Error('Start from a Herdr-managed pane (HERDR_ENV=1), or use --logs/--demo.');
+    if (fs.existsSync(o.teamMap)) teamMap = JSON.parse(fs.readFileSync(o.teamMap, 'utf8'));
+  }
+  const watcher = o.demo ? new DemoWatcher() : o.logs ? new Watcher({ hours: o.hours })
+    : new TeamWatcher({ herdr: new HerdrWatcher({ teamMap }), logs: new Watcher({ hours: o.hours }) });
 
   if (o.json) {
-    const w = new Watcher({ hours: o.hours });
-    w.tick();
-    w.lastScan = 0;
-    w.tick();
-    console.log(JSON.stringify(snapshot(w, o).sessions, null, 2));
+    if (o.demo) watcher.start();
+    else { await watcher.tick(); if (o.logs) { watcher.lastScan = 0; watcher.tick(); } }
+    console.log(JSON.stringify(snapshot(watcher, o), null, 2));
+    watcher.stop();
     return;
   }
 
-  const query = o.scene ? `/?view=office&quality=high&scene=${encodeURIComponent(o.scene)}` : '';
+  const query = o.scene ? `/office?view=office&quality=high&scene=${encodeURIComponent(o.scene)}` : '';
   if (await alreadyRunning(o.port)) {
-    const url = `http://localhost:${o.port}${query}`;
+    const url = `http://127.0.0.1:${o.port}${query}`;
     console.log(`Already running at ${url}`);
-    await printUpdateHint();
     if (o.open) openBrowser(url);
     return;
   }
 
-  const watcher = (o.demo ? new DemoWatcher() : new Watcher({ hours: o.hours })).start();
+  watcher.start();
   const server = createServer(watcher, o, {
     onShutdown: () => { watcher.stop(); server.close(); process.exit(0); },
-    // after an update from the page: start the new code on the same port
-    onRestart: () => {
-      watcher.stop();
-      server.close(() => {
-        const args = process.argv.slice(2).filter((a) => a !== '--no-open' && !a.startsWith('--scene'));
-        spawn(process.execPath, [__filename, ...args, '--no-open'], { detached: true, stdio: 'ignore' }).unref();
-        process.exit(0);
-      });
-      server.closeAllConnections && server.closeAllConnections();
-    },
   });
+  const shutdown = () => { watcher.stop(); server.closeAllConnections?.(); server.close(() => process.exit(0)); };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 
   const listen = (port, tries) => {
     server.once('error', (err) => {
-      if (err.code === 'EADDRINUSE' && tries > 0) listen(port + 1, tries - 1);
-      else { console.error(err.message); process.exit(1); }
+      console.error(err.message); watcher.stop(); process.exit(1);
     });
     server.listen(port, '127.0.0.1', () => {
-      const url = `http://localhost:${port}`;
+      const url = `http://127.0.0.1:${port}`;
       const n = watcher.sessions().length;
       const openUrl = url + query;
-      const what = o.demo ? 'demo team' : `${n} session${n === 1 ? '' : 's'} in the last ${o.hours}h`;
+      const what = o.demo ? 'demo team' : o.logs ? `${n} local log sessions` : 'read-only Herdr teams · private';
       console.log(`whatsmyagentdoing v${updater.localVersion()} → ${url}  (${what}, Ctrl+C to stop)`);
-      printUpdateHint();
       if (o.open) openBrowser(openUrl);
     });
   };
-  listen(o.port, 10);
+  listen(o.port, 0);
 }
 
-main();
+main().catch(error => { console.error(error.message); process.exitCode = 1; });

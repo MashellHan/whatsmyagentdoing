@@ -1,5 +1,7 @@
 # 👀 whatsmyagentdoing
 
+> **Team Houses fork:** run `WMAD_NO_UPDATE_CHECK=1 node bin/cli.js --no-open --private --port 4546` from a Herdr-managed terminal. This fork adds a private, log-first local team neighborhood while keeping the original office/list/3D/PiP views. Updates and scene downloads are disabled. See [Team Houses](docs/TEAM-HOUSES.md). The upstream overview below is retained for reference.
+
 **A Claude Code / Codex skill: type `/myoffice` and see what every Claude Code, Codex and Gemini CLI agent on your machine is doing — live, in a little office.**
 
 ![The 3D office: agents at their desks, off-duty ones wandering around](docs/office-3d.gif)
