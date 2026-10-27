@@ -439,6 +439,10 @@ function sourceBadge(s) {
   const fallback = statusSource(s) === 'herdr';
   return `<span class="source-badge" data-source="${fallback ? 'herdr' : 'log'}" title="${fallback ? '未找到唯一的 provider + session ID 日志，回退 Herdr 状态' : '原版会话日志推断，包含原版静默超时规则'}">${fallback ? 'Herdr 回退 · ' + esc(s.herdrStatus || s.sourceStatus || 'unknown') : '会话日志'}</span>`;
 }
+function roleBadge(s) {
+  const label = { leader: '★ leader', dev: 'dev', designer: 'designer' }[s.role];
+  return label ? `<span class="role-label">${label}</span>` : '';
+}
 function renderTeam() {
   if (!TEAM) return;
   const team = state.data.teams?.find(t => t.id === TEAM);
@@ -458,7 +462,7 @@ function renderTeam() {
   document.getElementById('leaderNote').textContent = members.some(s => s.role === 'leader')
     ? '★ Leader 保留主位；空闲不显示工作动作。' : 'Leader 未显式配置，不推断成员角色。';
   const content = members.map(s => `<div class="team-member" data-testid="member" data-pane-id="${esc(s.paneId || s.key)}" data-key="${esc(s.key)}" data-status="${esc(s.status)}" data-agent="${esc(s.agent)}" data-role="${esc(s.role)}" data-source="${statusSource(s)}">
-    <div class="member-identity"><span class="agent ${esc(s.agent)}">${agentLogo(s.agent)}</span><span class="member-name">${esc(s.displayName || s.project || s.id)}</span>${s.role === 'leader' ? '<span class="role-label">★ leader</span>' : ''}</div>
+    <div class="member-identity"><span class="agent ${esc(s.agent)}">${agentLogo(s.agent)}</span><span class="member-name">${esc(s.displayName || s.project || s.id)}</span>${roleBadge(s)}</div>
     <div class="member-meta">${esc(AGENT_NAME[s.agent] || s.agent)} · ${esc(s.paneId || '未分组日志')}</div>
     <div class="member-state" data-s="${esc(s.status)}"><span class="dot"></span><span>${esc(L[s.status] || s.status)}</span><code>${esc(s.status)}</code></div>
     <div class="member-sources">${sourceBadge(s)}${s.presence === 'stale' ? '<span class="stale-chip">身份 stale</span>' : ''}</div>
@@ -483,7 +487,7 @@ function card(s, now) {
       <span class="time" data-time="${esc(s.key)}">${esc(timeLabel(s, now))}</span>
     </div>
     ${title}
-    <div class="session-source">${sourceBadge(s)}${s.paneId ? `<span>${esc(s.paneId)}</span>` : ''}${s.role === 'leader' ? '<span>★ leader</span>' : ''}</div>
+    <div class="session-source">${sourceBadge(s)}${s.paneId ? `<span>${esc(s.paneId)}</span>` : ''}${roleBadge(s)}</div>
     <div class="status"><span class="ind"><i></i><i></i><i></i></span><span class="lbl">${esc(L[s.status] || s.status)}</span>${act}</div>
     ${err}${q}${r}
     <div class="foot"><span class="model">${esc((s.model || '') + sub)}</span>${resumeCmd(s) ? `<button class="copy" data-copy="${esc(resumeCmd(s))}">${L.copy}</button>` : ''}</div>

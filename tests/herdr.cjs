@@ -94,3 +94,22 @@ test('snapshot defaults private and never uses prompt/title for Herdr identity',
   assert.equal(result.sessions.find(s => s.paneId === 'w1:p0').displayName, 'w1:p0');
   assert.equal(result.sessions[0].capabilities.resume, false);
 });
+
+test('configured dev/designer roles require exact pane and expected name without electing a leader', async () => {
+  const f = fixture();
+  f.w.teamMap.members = {
+    'w1:p2': { expectedName: 'member-2', role: 'dev' },
+    'w1:p3': { expectedName: 'member-3', role: 'designer' },
+    'w1:p4': { expectedName: 'wrong-name', role: 'dev' },
+    'w1:p5': { expectedName: 'member-5', role: 'leader' },
+  };
+  await f.w.tick();
+  const byPane = new Map(snapshot(f.w).sessions.map(s => [s.paneId, s]));
+  assert.equal(byPane.get('w1:p1').role, 'leader');
+  assert.equal(byPane.get('w1:p2').role, 'dev');
+  assert.equal(byPane.get('w1:p3').role, 'designer');
+  assert.equal(byPane.get('w1:p4').role, 'member');
+  assert.equal(byPane.get('w1:p5').role, 'member');
+  f.data.agents[2].name = 'replacement'; await f.w.tick();
+  assert.equal(f.w.sessions()[2].role, 'member');
+});
