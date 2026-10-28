@@ -220,7 +220,7 @@ class Watcher extends EventEmitter {
       return true;
     }
     let changed = false;
-    if (t.whole && st.mtimeMs !== t.mtime) {
+    if (t.whole && (st.mtimeMs !== t.mtime || st.size !== t.offset)) {
       // legacy single-document session: re-read it whole
       this.trackers.delete(c.file);
       this.open(c, st);
