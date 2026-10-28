@@ -88,6 +88,7 @@ async function layoutCheck(page, width) {
       window.EventSource = class extends Native { constructor(...args) { super(...args); window.fixtureEvents = this; } };
     });
     await page.goto(base); await page.waitForSelector('[data-testid=house]'); await settle(page);
+    await page.locator('#townLayout [data-layout=wide]').click(); await settle(page);
     const house = id => page.locator(`[data-team-id="${id}"]`);
     const emit = async () => { source.emit('change'); await settle(page); };
     const setStates = async statuses => {
@@ -105,7 +106,7 @@ async function layoutCheck(page, width) {
       };
     });
     const visibility = (id, selector) => house(id).locator(selector).evaluate(el => getComputedStyle(el).visibility);
-    const animations = id => house(id).locator('.puff,.flag-cloth,.window-person').evaluateAll(nodes => nodes.map(n => getComputedStyle(n).animationName));
+    const animations = id => house(id).locator('.puff,.flag-cloth,.window-person,.window-light').evaluateAll(nodes => nodes.map(n => getComputedStyle(n).animationName));
     assert.equal(await page.locator('#busy-team-count').innerText(), '1');
     assert.equal(await page.locator('#idle-team-count').innerText(), '1');
     assert.equal(await page.locator('#working-count').innerText(), '4');
@@ -134,28 +135,30 @@ async function layoutCheck(page, width) {
     assert.equal(await page.evaluate(() => savedHouse === document.activeElement && savedArt === savedHouse.querySelector('.house-illustration') && savedAnimation === savedArt.querySelector('.puff').getAnimations()[0]), true);
     // Real-time sampling for >3 smoke cycles; a single screenshot cannot establish continuity.
     const motion = await house('w1').evaluate(el => new Promise(resolve => {
-      let samples = 0, gaps = 0, escaped = 0; const flags = new Set(), people = new Set(), start = performance.now();
+      let samples = 0, gaps = 0, escaped = 0; const flags = new Set(), people = new Set(), lights = new Set(), start = performance.now();
       const timer = setInterval(() => {
         samples++;
         const puffs = [...el.querySelectorAll('.puff')];
-        if (!puffs.some(n => +getComputedStyle(n).opacity > .1)) gaps++;
+        if (!puffs.some(n => +getComputedStyle(n).opacity > .5)) gaps++;
         const top = el.querySelector('.house-art-stage').getBoundingClientRect().top;
         if (puffs.some(n => n.getBoundingClientRect().top < top+4)) escaped++;
         flags.add(getComputedStyle(el.querySelector('.flag-cloth')).transform);
         people.add(getComputedStyle(el.querySelector('.window-person')).transform);
-        if (performance.now()-start >= 12000) { clearInterval(timer); resolve({ samples,gaps,escaped,flags:flags.size,people:people.size }); }
+        lights.add(getComputedStyle(el.querySelector('.window-light')).opacity);
+        if (performance.now()-start >= 12000) { clearInterval(timer); resolve({ samples,gaps,escaped,flags:flags.size,people:people.size,lights:lights.size }); }
       }, 100);
     }));
     // Background Chromium may coalesce timers; require coverage across the full 12s,
     // not an exact wall-clock scheduling rate on a busy development machine.
     assert.ok(motion.samples >= 10, JSON.stringify(motion)); assert.equal(motion.gaps,0); assert.equal(motion.escaped,0);
-    assert.ok(motion.flags > 3 && motion.people > 3, JSON.stringify(motion));
+    assert.ok(motion.flags > 3 && motion.people > 3 && motion.lights > 3, JSON.stringify(motion));
     console.log('PASS 12s continuous busy motion', JSON.stringify(motion));
     for (const [kind, states] of [['idle',Array(5).fill('done')], ['attention',Array(5).fill('waiting')], ['unknown',Array(5).fill('unknown')], ['empty',[]], ['busy',Array(5).fill('tool')]]) {
       await setStates(states); await waitKind(kind);
       assert.deepEqual(await style('w1'), baseline, `same-house palette ${kind}`);
       assert.equal(await house('w1').locator('.state-symbol').innerText(), symbols[kind]);
       assert.equal(await visibility('w1','.smoke'), kind === 'busy' ? 'visible' : 'hidden');
+      assert.equal(await visibility('w1','.window-light'), kind === 'busy' ? 'visible' : 'hidden');
       assert.equal(await visibility('w1','.sleeping-cat'), kind === 'idle' ? 'visible' : 'hidden');
       assert.equal(await visibility('w1','.closed-curtains'), ['idle','empty'].includes(kind) ? 'visible' : 'hidden');
       if (kind !== 'busy') assert.ok((await animations('w1')).every(name => name === 'none'));

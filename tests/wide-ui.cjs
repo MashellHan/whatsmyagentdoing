@@ -155,6 +155,7 @@ async function assertLabelPicking(page, name) {
     });
     const page=await context.newPage(), measured={town:[],mid:[],high:[]};
     await page.goto(base); await page.waitForSelector('.house');
+    await page.locator('#townLayout [data-layout=wide]').click(); await settle(page);
     for(const width of [1440,1920,2560]) {
       await page.setViewportSize({width,height:900}); await settle(page);
       measured.town.push(await page.locator('.house').first().evaluate(n=>{
@@ -163,6 +164,7 @@ async function assertLabelPicking(page, name) {
       }));
     }
     await page.goto(`${base}/office?team=wide&quality=mid`); await ready(page);
+    await page.locator('[data-scale=wide]').click(); await settle(page);
     for(const quality of ['mid','high']) {
       if(quality==='high'){await tagDesks(page);await page.click('#qualSeg [data-v=high]');await ready(page);}
       for(const width of [1440,1920,2560]) {
@@ -264,7 +266,7 @@ async function assertLabelPicking(page, name) {
         assert.equal(m.labelScale,1,'small viewports preserve original label size');
         await assertLabelPicking(page,`small ${quality} ${width} name picking`);
         assert.ok(m.ch<850);
-        assert.equal(await page.locator('#teamRoster').evaluate(n=>n.getBoundingClientRect().top>=document.querySelector('#office').getBoundingClientRect().bottom),true);
+        if (width < 1024) assert.equal(await page.locator('#teamRoster').evaluate(n=>n.getBoundingClientRect().top>=document.querySelector('#office').getBoundingClientRect().bottom),true);
       }
     }
     // Plan growth is driven by workers only, and its full room still fits.

@@ -39,8 +39,6 @@ h1 span { color: #9a6d30; }
 .town-map { position: relative; border: 1px solid #cfd8c2; border-radius: 7px; background: radial-gradient(#c5d0b4 .8px, transparent .8px) 0 0 / 13px 13px #e6ecda; padding: 0 24px; }
 .map-caption, .map-footer { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; font: 10px/1.7 var(--mono); color: #536248; }
 .map-caption { padding: 18px 0 12px; letter-spacing: 1px; }
-#map-note { font-size: 9px; }
-#map-note i { font-style: normal; border-left: 1px solid #bccab0; margin-left: 16px; padding-left: 16px; }
 .map-footer { padding: 12px 0 16px; border-top: 1px solid #cad4bd; }
 .neighborhood { --lot-min-height: 420px; --lot-height: 420px; --street-gap: 80px; --avenue-width: 90px; --road-width: 66px; --road-center: 50%; --art-height: 192px; position: relative; isolation: isolate; padding: 8px 20px 20px; }
 .houses { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: var(--lot-height); column-gap: var(--avenue-width); row-gap: var(--street-gap); position: relative; }
@@ -55,7 +53,7 @@ h1 span { color: #9a6d30; }
 .neighborhood[data-rows="1"] .plaza, .neighborhood[data-rows="1"] .street-decor { display: none; }
 .house { --lot-offset: 0px; position: relative; z-index: 2; min-width: 0; align-self: start; display: flex; flex-direction: column; gap: 8px; border: 0; border-radius: 8px; background: transparent; padding: 0; text-align: center; cursor: pointer; transform: translateY(var(--lot-offset)); }
 .house:focus-visible { z-index: 3; }
-.house-art-stage { display: block; padding-top: 32px; /* 24px minimum, plus max-scale/hover smoke clearance */ }
+.house-art-stage { display: block; padding-top: max(42px,calc(var(--art-height) * .18 + 12px)); }
 .house-illustration { display: block; width: 100%; height: var(--art-height); overflow: visible; transform: scale(var(--house-size, 1)); transform-origin: center bottom; transition: transform .25s; }
 .house-sign { position: relative; display: block; width: min(100%, 350px); min-height: 180px; margin: 0 auto; padding: 12px 16px; background: #fffcf2; border: 1px solid #c3d0b7; border-radius: 4px; box-shadow: 0 3px 0 #b8c8a880, 0 6px 14px #4c66430a; overflow-wrap: anywhere; }
 .house-number { display: flex; align-items: center; justify-content: space-between; gap: 6px; font: 10px/1.6 var(--mono); color: #5e6955; margin-bottom: 4px; }
@@ -73,15 +71,18 @@ h1 span { color: #9a6d30; }
 .house-freshness { margin-top: 4px; }
 .freshness-clock { display: inline-block; vertical-align: -3px; width: 16px; height: 16px; margin-right: 4px; fill: none; stroke: currentColor; stroke-width: 1.5; }
 .house[data-stale=true] .house-sign { border-style: dashed; }
-.window-glow { fill: #ffdf97; }
-.smoke, .roof-pennant, .window-person, .closed-curtains, .sleeping-cat { visibility: hidden; }
-.house[data-activity=busy] :is(.smoke, .roof-pennant, .window-person) { visibility: visible; }
+.window-glow { fill: #ffe49a; stroke:#eac46b; stroke-width:1; }
+.window-light { opacity:.78; }
+.smoke { fill:#fffdf4; stroke:#a4b09e; stroke-width:1.2; stroke-linejoin:round; }
+.smoke-ridge { fill:none; stroke:#d5ddce; stroke-width:1.4; stroke-linecap:round; }
+.smoke, .roof-pennant, .window-person, .window-light, .closed-curtains, .sleeping-cat { visibility: hidden; }
+.house[data-activity=busy] :is(.smoke, .roof-pennant, .window-person, .window-light) { visibility: visible; }
 .house[data-activity=idle] :is(.closed-curtains, .sleeping-cat), .house[data-activity=empty] .closed-curtains { visibility: visible; }
 .house[data-activity=idle] .activity-emblem { visibility: hidden; }
 /* Static poses are the default, shared by reduce, manual pause and stale. */
-.puff-one { transform: translate(0,0); opacity: .8; }
-.puff-two { transform: translate(-5px,-12px); opacity: .7; }
-.puff-three { transform: translate(-10px,-23px); opacity: .6; }
+.puff-one { transform: translate(2px,3px) scale(.75); opacity: .96; }
+.puff-two { transform: translate(-7px,-12px); opacity: .9; }
+.puff-three { transform: translate(-16px,-27px) scale(1.12); opacity: .78; }
 .puff { transform-box: fill-box; transform-origin: center; }
 .flag-cloth { transform-origin: 154px 25px; }
 .house[data-activity=busy][data-static=false] .puff { animation: chimney-puff 3.6s linear infinite; }
@@ -89,9 +90,11 @@ h1 span { color: #9a6d30; }
 .house[data-activity=busy][data-static=false] .puff-three { animation-delay: -2.4s; }
 .house[data-activity=busy][data-static=false] .flag-cloth { animation: pennant-wave 2.4s ease-in-out infinite; }
 .house[data-activity=busy][data-static=false] .window-person { animation: window-walk 3.4s ease-in-out infinite; }
-@keyframes chimney-puff { 0% { opacity: 0; transform: translate(0,6px) scale(.8); } 15% { opacity: .85; } 80% { opacity: .6; } 100% { opacity: 0; transform: translate(-12px,-24px) scale(1.16); } }
+.house[data-activity=busy][data-static=false] .window-light { animation: window-light 2.8s ease-in-out infinite; }
+@keyframes chimney-puff { 0% { opacity: 0; transform: translate(4px,9px) scale(.58); } 15% { opacity: 1; } 70% { opacity: .85; } 100% { opacity: 0; transform: translate(-22px,-32px) scale(1.18); } }
+@keyframes window-light { 0%,100% { opacity:.42; } 50% { opacity:.96; } }
 @keyframes pennant-wave { 0%,100% { transform: skewY(-5deg) scaleX(.92); } 50% { transform: skewY(5deg) scaleX(1.06); } }
-@keyframes window-walk { 0%,100% { transform: translateX(-4px); } 50% { transform: translateX(5px); } }
+@keyframes window-walk { 0%,100% { transform: translateX(-6px); } 50% { transform: translateX(6px); } }
 @media (hover:hover) and (pointer:fine) {
   .house[data-static=false]:is(:hover,:focus-visible) .house-illustration { transform: translateY(-5px) scale(var(--house-size,1)); }
   .house[data-static=false]:is(:hover,:focus-visible) .house-arrow { transform: translate(2px,-2px); }
@@ -137,7 +140,7 @@ body[data-motion-static=true] *, .house[data-static=true] * { transition: none !
   .house { container-type: inline-size; }
   .house-art-stage {
     --art-height: min(clamp(256px,calc(14vw + 90px),448px),calc((100cqw - 32px) * .737));
-    padding-top: max(36px,calc(var(--art-height) * .12 + 12px));
+    padding-top: max(42px,calc(var(--art-height) * .18 + 12px));
   }
   .house-sign { width: min(100%,clamp(350px,27vw,520px)); }
   .house:nth-child(4n+1) { margin-left: 12px; margin-right: 38px; }
@@ -191,8 +194,6 @@ body[data-motion-static=true] *, .house[data-static=true] * { transition: none !
   .site-header { padding-inline: 16px; }
   .connection { width: 100%; }
   .town-stats { gap: 12px; }
-  #map-note { font-size: 0; }
-  #map-note i { font-size: 9px; border: 0; margin: 0; padding: 0; }
   .neighborhood { --lot-min-height: 400px; --street-gap: 56px; --road-center: 16px; --road-width: 24px; --art-height: 164px; padding-left: 42px; }
   .house-sign { width: 100%; min-height: 204px; }
   .avenue span, .street-bench { display: none; }
@@ -204,4 +205,78 @@ body[data-motion-static=true] *, .house[data-static=true] * { transition: none !
 }
 @media (max-width:380px) {
   .house-meta { align-items: flex-start; flex-direction: column; }
+}
+
+.town-layout { display:flex; gap:2px; padding:3px; border:1px solid #bdcbb1; border-radius:7px; background:#f7f8f0; }
+.town-layout button { min-height:32px; padding:4px 10px; border:0; border-radius:4px; background:transparent; color:var(--muted); font-size:12px; cursor:pointer; }
+.town-layout button[aria-pressed=true] { background:var(--green); color:#fff; }
+.town-help { margin:8px auto; max-width:900px; color:var(--muted); font-size:11px; }
+.town-help summary { width:fit-content; margin:auto; padding:4px 8px; cursor:pointer; }
+.town-help[open] summary { margin-bottom:6px; }
+
+/* Compact is the overview; the original neighborhood remains available as wide. */
+body[data-layout=compact] .site-header,
+body[data-layout=compact] main,
+body[data-layout=compact] .site-footer { max-width:1600px; padding-inline:24px; }
+body[data-layout=compact] .site-header { padding-block:10px; }
+body[data-layout=compact] .brand { font-size:21px; }
+body[data-layout=compact] .intro { padding:14px 0; gap:24px; }
+body[data-layout=compact] .eyebrow { margin-bottom:6px; }
+body[data-layout=compact] h1 { font-size:25px; line-height:1.35; }
+body[data-layout=compact] .intro-copy,
+body[data-layout=compact] .summary-freshness { display:none; }
+body[data-layout=compact] .overview { min-width:330px; padding-left:22px; }
+body[data-layout=compact] .town-stats { gap:20px; padding-top:0; }
+body[data-layout=compact] .town-stats strong { font-size:28px; }
+body[data-layout=compact] .town-stats span { margin-top:5px; }
+body[data-layout=compact] #overview-note { margin-top:8px; }
+body[data-layout=compact] .town-map { padding-inline:18px; }
+body[data-layout=compact] .map-caption { padding:10px 0 4px; }
+body[data-layout=compact] .map-footer { padding:8px 0; }
+body[data-layout=compact] .neighborhood { --lot-min-height:0px; --street-gap:20px; --avenue-width:20px; padding:0 0 8px; }
+body[data-layout=compact] .houses { grid-template-columns:repeat(4,minmax(0,1fr)); }
+body[data-layout=compact] .house { margin:0; --lot-offset:0px; }
+body[data-layout=compact] .house-art-stage { --art-height:clamp(128px,21vh,184px); padding-top:max(40px,calc(var(--art-height) * .18 + 10px)); }
+body[data-layout=compact] .house-sign { width:100%; min-height:0; padding:10px 12px; border-radius:6px; }
+body[data-layout=compact] .house-name { min-height:20px; font-size:14px; line-height:20px; }
+body[data-layout=compact] .house-meta { margin-top:6px; }
+body[data-layout=compact] .house-divider { margin:6px 0; }
+body[data-layout=compact] .house-note { min-height:0; }
+body[data-layout=compact] :is(.streets,.street-decor,.green-borders) { display:none; }
+body[data-layout=compact] .town-toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px 16px; padding:10px 0 2px; }
+body[data-layout=compact] .legend { justify-content:flex-start; gap:8px 14px; margin:0; font-size:11px; }
+body[data-layout=compact] .motion-controls { margin:0; font-size:11px; }
+body[data-layout=compact] #motion-toggle { min-height:32px; padding:4px 10px; }
+body[data-layout=compact] .site-footer { padding-block:10px; gap:8px 16px; }
+body[data-layout=compact] .empty { padding-block:40px; }
+@media (min-width:761px) and (max-height:780px) {
+  body[data-layout=compact] .site-header,
+  body[data-layout=compact] .site-footer { padding-block:8px; }
+  body[data-layout=compact] .intro { padding-block:8px; }
+}
+@media (min-width:761px) and (max-width:1099px) {
+  body[data-layout=compact] .intro { display:flex; }
+  body[data-layout=compact] .overview { margin:0; padding:0 0 0 18px; border-top:0; border-left:1px solid var(--line); }
+  body[data-layout=compact] .houses { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  body[data-layout=compact] .house { flex-direction:row; align-items:center; }
+  body[data-layout=compact] .house-art-stage { flex:0 0 120px; --art-height:128px; padding-top:28px; }
+  body[data-layout=compact] .house-sign { flex:1; min-width:0; text-align:left; }
+}
+@media (max-width:760px) {
+  body[data-layout=compact] .site-header,
+  body[data-layout=compact] main,
+  body[data-layout=compact] .site-footer { padding-inline:16px; }
+  body[data-layout=compact] .header-meta { gap:8px 12px; }
+  body[data-layout=compact] .overview { min-width:0; margin-top:12px; padding:10px 0 0; }
+  body[data-layout=compact] .houses { grid-template-columns:minmax(0,1fr); }
+  body[data-layout=compact] .house { flex-direction:row; align-items:center; }
+  body[data-layout=compact] .house-art-stage { flex:0 0 92px; --art-height:104px; padding-top:20px; }
+  body[data-layout=compact] .house-sign { flex:1; min-width:0; text-align:left; }
+  body[data-layout=compact] .town-map { padding-inline:12px; }
+  body[data-layout=compact] .map-caption { gap:6px; }
+  body[data-layout=compact] .town-layout button { padding-inline:8px; }
+}
+@media (max-width:380px) {
+  body[data-layout=compact] .house-art-stage { flex-basis:64px; --art-height:86px; }
+  body[data-layout=compact] .house-meta { flex-direction:row; }
 }

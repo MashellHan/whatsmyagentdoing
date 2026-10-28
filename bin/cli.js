@@ -20,7 +20,7 @@ const pkg = require('../package.json');
 const HELP = `whatsmyagentdoing ${pkg.version}
 See what every Claude Code, Codex and Gemini CLI agent on this machine is doing, live.
 
-Usage: node bin/cli.js [options]   (or /myoffice as a skill)
+Usage: node bin/cli.js [options]   (Codex: $myoffice; Claude Code: /myoffice)
 
 Options:
   -p, --port <n>    Port to serve on (default 4546)
@@ -28,6 +28,7 @@ Options:
   --no-open         Don't open the browser
   --private         Hide prompts, replies and titles (always enabled)
   --logs            Read local logs instead of Herdr; show an ungrouped house
+  --herdr-session <name>  Read a specific Herdr session, including from outside Herdr
   --team-map <file>  Explicit leader map (default config/team-houses.json)
   --json            Print one snapshot as JSON and exit
   --demo            Show a made-up team instead of your sessions
@@ -37,6 +38,7 @@ Options:
   -h, --help        Show this help
 
 Default: Herdr team identity + exact session log status (read only).
+Outside Herdr, use --herdr-session with a name from herdr session list --json.
 --logs reads logs without Herdr grouping. Log locations:
   ${CLAUDE_DIR}
   ${CODEX_DIR}
@@ -44,7 +46,7 @@ Default: Herdr team identity + exact session log status (read only).
 Override with CLAUDE_CONFIG_DIR / CODEX_HOME / GEMINI_CLI_HOME.`;
 
 function parseArgs(argv) {
-  const o = { port: 4546, hours: 24, open: true, privacy: true, logs: false, teamMap: path.join(__dirname, '../config/team-houses.json'), json: false, demo: false, stop: false, scenes: false, scene: null, removeScene: null };
+  const o = { port: 4546, hours: 24, open: true, privacy: true, logs: false, herdrSession: null, teamMap: path.join(__dirname, '../config/team-houses.json'), json: false, demo: false, stop: false, scenes: false, scene: null, removeScene: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '-h' || a === '--help') { console.log(HELP); process.exit(0); }
@@ -56,6 +58,11 @@ function parseArgs(argv) {
     else if (a === '--no-open') o.open = false;
     else if (a === '--private') o.privacy = true;
     else if (a === '--logs') o.logs = true;
+    else if (a === '--herdr-session' || a.startsWith('--herdr-session=')) {
+      const name = a === '--herdr-session' ? argv[++i] : a.slice('--herdr-session='.length);
+      if (!name || !name.trim() || name.startsWith('-')) throw new Error('--herdr-session requires a session name; see herdr session list --json.');
+      o.herdrSession = name;
+    }
     else if (a === '--team-map') o.teamMap = argv[++i];
     else if (a === '--json') o.json = true;
     else if (a === '--demo') o.demo = true;
@@ -68,6 +75,7 @@ function parseArgs(argv) {
     else { console.error(`Unknown option: ${a}\n\n${HELP}`); process.exit(1); }
   }
   if (!Number.isInteger(o.port) || o.port < 1024 || o.port > 65535 || !Number.isFinite(o.hours) || o.hours <= 0) { console.error(HELP); process.exit(1); }
+  if (o.herdrSession && (o.logs || o.demo)) throw new Error('--herdr-session cannot be combined with --logs or --demo.');
   return o;
 }
 
@@ -134,11 +142,11 @@ async function main() {
 
   let teamMap = {};
   if (!o.demo && !o.logs) {
-    if (process.env.HERDR_ENV !== '1') throw new Error('Start from a Herdr-managed pane (HERDR_ENV=1), or use --logs/--demo.');
+    if (process.env.HERDR_ENV !== '1' && !o.herdrSession) throw new Error('Start from a Herdr-managed pane, pass --herdr-session <name>, or use --logs/--demo.');
     if (fs.existsSync(o.teamMap)) teamMap = JSON.parse(fs.readFileSync(o.teamMap, 'utf8'));
   }
   const watcher = o.demo ? new DemoWatcher() : o.logs ? new Watcher({ hours: o.hours })
-    : new TeamWatcher({ herdr: new HerdrWatcher({ teamMap }), logs: new Watcher({ hours: o.hours }) });
+    : new TeamWatcher({ herdr: new HerdrWatcher({ teamMap, session: o.herdrSession }), logs: new Watcher({ hours: o.hours }) });
 
   if (o.json) {
     if (o.demo) watcher.start();

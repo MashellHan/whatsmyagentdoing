@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { HerdrWatcher, rows } = require('../src/herdr');
 const { snapshot } = require('../src/server');
 
-function fixture() {
+function fixture({ session } = {}) {
   let now = 1000, fail = false;
   const data = {
     workspaces: [{ workspace_id: 'w1', label: 'Alpha', agent_status: 'working' }, { workspace_id: 'w2', label: 'Empty' }],
@@ -15,10 +15,10 @@ function fixture() {
   };
   const calls = [];
   const w = new HerdrWatcher({ teamMap: { workspaces: { w1: { leaderPane: 'w1:p1', expectedName: 'member-1' } } }, now: () => now,
-    run: async (cmd, args, options) => {
+    session, run: async (cmd, args, options) => {
       calls.push({ cmd, args, options });
       if (fail) throw Error('private terminal content must not leak');
-      const field = args[0] === 'workspace' ? 'workspaces' : 'agents';
+      const field = args.at(-2) === 'workspace' ? 'workspaces' : 'agents';
       return { stdout: JSON.stringify({ result: { [field]: data[field] } }) };
     },
   });
@@ -37,6 +37,22 @@ test('Herdr fixed read commands, schema, exact status mapping and explicit names
   assert.equal(f.w.teams().length, 2, 'empty workspace has a house');
   assert.equal(JSON.stringify(f.w.sessions()).includes('SECRET'), false);
   assert.equal(JSON.stringify(f.w.sessions()).includes('/same/workspace'), false);
+});
+
+test('an explicit Herdr session stays selected through read failures and recovery', async () => {
+  const f = fixture({ session: 'fixture-session' });
+  await f.w.tick();
+  const members = f.w.sessions().map(s => s.key);
+  f.fail(true); await f.w.tick();
+  assert.equal(f.w.sourceInfo().presence, 'stale');
+  assert.deepEqual(f.w.sessions().map(s => s.key), members);
+  f.fail(false); await f.w.tick();
+  assert.equal(f.w.sourceInfo().presence, 'fresh');
+  assert.equal(f.w.sourceInfo().scope, 'selected-herdr-session');
+  assert.equal(f.w.sourceInfo().session, 'fixture-session');
+  assert.equal(f.calls.length, 6);
+  assert.ok(f.calls.every(c => c.cmd === 'herdr' && c.args[0] === '--session' && c.args[1] === 'fixture-session' && !c.options.shell));
+  assert.deepEqual(f.calls.slice(0, 2).map(c => c.args.slice(2)), [['workspace', 'list'], ['agent', 'list']]);
 });
 
 test('unchanged polls are quiet, raw working/blocked never time out, rename keeps seat key', async () => {

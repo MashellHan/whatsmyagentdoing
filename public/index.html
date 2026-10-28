@@ -279,7 +279,7 @@
   </div>
   <div id="officeWrap">
     <div id="stageScale" aria-label="画布尺度">
-      <div class="seg" role="group" aria-label="画布显示模式"><button type="button" data-scale="wide">宽屏大图</button><button type="button" data-scale="fit">适窗全景</button></div>
+      <div class="seg" role="group" aria-label="画布显示模式"><button type="button" data-scale="fit">适应窗口</button><button type="button" data-scale="wide">放大查看</button></div>
       <span class="stage-note" id="stageNote">完整房间等比显示</span>
     </div>
     <div class="office loading" id="office"><div class="office-loader"><div class="spin"></div><span id="loaderText"></span></div></div>
@@ -711,7 +711,7 @@ function layoutStage() {
   stageFrame = 0;
   if (PIP || !office || !officeEl.checkVisibility()) return;
   const desktop = innerWidth >= 1200;
-  const wide = desktop && (stageChoice || 'wide') === 'wide';
+  const wide = desktop && (stageChoice || 'fit') === 'wide';
   const scale = document.getElementById('stageScale');
   scale.hidden = innerWidth <= 900;
   scale.querySelector('[data-scale=wide]').disabled = !desktop;
@@ -719,7 +719,7 @@ function layoutStage() {
     const selected = button.dataset.scale === (wide ? 'wide' : 'fit');
     button.classList.toggle('on', selected); button.setAttribute('aria-pressed', String(selected));
   }
-  document.getElementById('stageNote').textContent = wide ? '完整大图 · 页面可向下滚动；3D 拖动旋转' : '适窗全景 · 完整房间等比显示';
+  document.getElementById('stageNote').textContent = wide ? '放大显示 · 可向下滚动查看' : '完整办公室 · 一屏查看';
   officeEl.dataset.scale = wide ? 'wide' : 'fit';
   let height;
   if (wide) {
@@ -736,13 +736,22 @@ function layoutStage() {
     height = Math.max(480,Math.ceil(Math.max(h2,h3)));
   } else if (innerWidth > 900) {
     const top = officeEl.getBoundingClientRect().top + scrollY;
-    const legends = ['legend','agentLegend'].reduce((h,id) => h + document.getElementById(id).getBoundingClientRect().height + 10,0);
-    height = Math.max(360,Math.floor(innerHeight - top - legends - 16));
+    const legends = ['legend','agentLegend'].reduce((h,id) => {
+      const el = document.getElementById(id), style = getComputedStyle(el);
+      return h + (el.checkVisibility() ? el.getBoundingClientRect().height + parseFloat(style.marginTop) + parseFloat(style.marginBottom) : 0);
+    },0);
+    const bottom = parseFloat(getComputedStyle(document.body).paddingBottom) || 16;
+    height = Math.max(240,Math.floor(innerHeight - top - legends - bottom));
   }
   const value = height ? `${height}px` : '';
   if (officeEl.style.getPropertyValue('--stage-height') !== value) {
     if (value) officeEl.style.setProperty('--stage-height',value); else officeEl.style.removeProperty('--stage-height');
   }
+  const roster = document.getElementById('teamRoster');
+  if (!wide && innerWidth >= 1024 && roster.checkVisibility()) {
+    const top = document.querySelector('.workspace-content').getBoundingClientRect().top + scrollY;
+    roster.style.setProperty('--roster-height',Math.max(180,Math.floor(innerHeight - top - 16)) + 'px');
+  } else roster.style.removeProperty('--roster-height');
   if (office.controls) office.controls.enableZoom = !wide;
 }
 document.getElementById('stageScale').addEventListener('click',e => {

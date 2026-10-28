@@ -1,61 +1,73 @@
 ---
 name: myoffice
-description: Open a live office view of every Claude Code, Codex and Gemini CLI agent on this machine — who is thinking, running a tool, writing a reply, waiting for the user, or done. Use when the user types /myoffice, asks what their agents are doing, wants to see all running sessions, or which agent is stuck or finished ("我的 agent 在幹嘛", "show my agents").
+description: Open a local dashboard of Herdr teams and Claude Code, Codex, and Gemini CLI activity. Use when the user invokes myoffice, asks what their local agents or Herdr teams are doing, or wants to start, stop, or restart the office dashboard.
 ---
 
 # myoffice
 
-Start the dashboard. It serves a local page and opens it in the browser.
-Run it **in the background** so it keeps running and doesn't block the chat
-(this skill's base directory is shown above as "Base directory for this skill"):
+This is the Team Houses fork. It shows Herdr workspaces and members, using exact
+session logs for activity when available and Herdr status otherwise.
+Requires Node.js 18+ and has no runtime packages to install.
+In Codex, invoke it with `$myoffice` or select it through `/skills`.
+
+## Choose the source and start
+
+Use the skill's base directory for `bin/cli.js`.
+
+For Herdr teams:
+
+- Inside a Herdr-managed terminal (`HERDR_ENV=1`), the dashboard inherits that
+  session. Start `node "<base directory>/bin/cli.js"` in the background.
+- Outside Herdr, run `herdr session list --json` and select a running session
+  using the user's context. When there is only one running session, use its
+  returned name. If several sessions remain plausible, ask which one to show.
+  Start in the background:
+
+  ```bash
+  node "<base directory>/bin/cli.js" --herdr-session "<session name>"
+  ```
+
+An explicit session uses bounded, read-only workspace and agent queries. It does
+not require opening a Herdr terminal or setting `HERDR_ENV` manually.
+Do not switch a request for Herdr teams to `--logs`: that option deliberately
+omits Herdr identity and groups local session logs into one ungrouped house.
+Use `--logs` when the user wants that view, or `--demo` for sample data.
+
+The default port is 4546; preserve a port the user requests or is already using
+by passing `--port`. The command opens the browser unless given `--no-open`.
+Keep the process running independently of the chat, with output redirected to a
+local log. Report the printed URL.
+
+Verify `/api/sessions` after starting. Herdr mode should report
+`source.kind: "logs+herdr"` and `source.presence: "fresh"`, with the expected
+teams and members. Explicit selection also reports `source.session`.
+A stale source is a connection failure, not evidence that the team is idle.
+
+## Stop and restart
+
+Determine the dashboard's actual port. To stop it, run in the foreground:
 
 ```bash
-node "<base directory>/bin/cli.js"
+node "<base directory>/bin/cli.js" --stop --port <port>
 ```
 
-If it is already running, the same command just reopens the browser tab.
+For a restart, wait until that port is released, then start with the intended
+source and the same port. Starting a second command while the dashboard is
+already running only reopens the page; it does not change its source mode.
+Confirm the resulting source and teams before reporting a successful restart.
 
-To **update** it — `/myoffice update`, or the user asks to update / upgrade —
-run `node "<base directory>/bin/cli.js" --update` (not in the background),
-report the version it printed, then start it again as above. The page also
-shows the version in the corner and an "Update" button when a new one is out.
+## Other options
 
-To **close** it — `/myoffice stop`, or the user asks to stop / close / shut the
-office down — run (not in the background):
+- `--json`: print a snapshot and exit. Keep the chosen `--herdr-session` or
+  `--logs` option when summarizing agents in chat.
+- `--hours 4`: include local logs active in the last four hours (default 24).
+- `--team-map FILE`: use explicit, local leader/member mappings. Do not infer
+  roles from names or pane order.
+- `--scenes`: list built-in and already-installed scenes.
+- `--scene ID`: open an installed scene, using an ID from that list.
 
-```bash
-node "<base directory>/bin/cli.js" --stop
-```
-
-and say it's stopped.
-Then tell the user, in one line, that the office is open at the printed URL.
-If the output also says **"Update available: vA → vB"**, tell the user a new
-version is out and offer to update it (`/myoffice update`, below).
-Requires Node.js 18+; if `node` is missing, say so and stop.
-
-## Scenes (3D)
-
-Besides the built-in office there are downloadable 3D scenes (e.g. a pirate
-cove). When the user asks for another scene, a different look, "DLC", or names
-one ("海盜船", "pirate"):
-
-1. `node "<base directory>/bin/cli.js" --scenes` — lists every scene, whether
-   it's installed, and its download size. Use the ids it prints; don't guess.
-2. `node "<base directory>/bin/cli.js" --scene <id>` (in the background) —
-   downloads it if needed (checksum-verified, data only) and opens the office
-   in that scene. `--scene office` goes back to the office.
-
-Scenes are only downloaded when asked for. `--remove-scene <id>` deletes one.
-
-Options the user may ask for:
-
-- `--private` — hide prompts/replies, show status only (for screen sharing)
-- `--hours 4` — only sessions active in the last 4 hours (default 24)
-- `--port 5000` — different port (default 4545)
-- `--stop` — stop the running dashboard
-- `--json` — print a one-off snapshot instead of opening a page. Use this when
-  the user asks in chat what their other agents are doing: run
-  `node "<base directory>/bin/cli.js" --json --hours 2` and summarize by status.
-
-Everything is read locally from `~/.claude/projects`, `~/.codex/sessions` and `~/.gemini/tmp`;
-the server listens on 127.0.0.1 only and sends nothing anywhere.
+This fork always hides prompts/replies and binds to loopback. Self-updates and
+scene downloads/removal are disabled. Use the repository's normal installation
+workflow for updates instead of `--update`.
+For team identity, status binding, and role configuration, see
+[Team Houses](docs/TEAM-HOUSES.md).

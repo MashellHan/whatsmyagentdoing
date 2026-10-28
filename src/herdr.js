@@ -22,16 +22,18 @@ function rows(output, field) {
 }
 
 class HerdrWatcher extends EventEmitter {
-  constructor({ teamMap = {}, interval = 2000, run = execute, now = Date.now } = {}) {
+  constructor({ teamMap = {}, session = null, interval = 2000, run = execute, now = Date.now } = {}) {
     super();
     this.teamMap = teamMap;
+    this.session = session;
+    this.context = session ? { scope: 'selected-herdr-session', session } : { scope: 'current-herdr-session' };
     this.interval = interval;
     this.run = run;
     this.now = now;
     this.members = [];
     this.houses = [];
     this.ruleDirectories = new Map(); // private only: never part of teams()/sessions()
-    this.health = { kind: 'herdr', scope: 'current-herdr-session', presence: 'connecting', error: null };
+    this.health = { kind: 'herdr', ...this.context, presence: 'connecting', error: null };
     this.pending = null;
     this.stopped = false;
   }
@@ -68,9 +70,10 @@ class HerdrWatcher extends EventEmitter {
     try {
       const options = { timeout: 4000, maxBuffer: 2 * 1024 * 1024, encoding: 'utf8', windowsHide: true, signal: this.controller.signal };
       // Fixed, read-only commands. Never interpolate pane IDs into a shell.
+      const prefix = this.session ? ['--session', this.session] : [];
       const results = await Promise.allSettled([
-        this.run('herdr', ['workspace', 'list'], options),
-        this.run('herdr', ['agent', 'list'], options),
+        this.run('herdr', [...prefix, 'workspace', 'list'], options),
+        this.run('herdr', [...prefix, 'agent', 'list'], options),
       ]);
       // Wait for both commands to settle even if one fails immediately.
       // Otherwise a slow sibling could overlap with the next poll.
@@ -125,13 +128,13 @@ class HerdrWatcher extends EventEmitter {
         };
       }).sort((a, b) => a.paneId.localeCompare(b.paneId, undefined, { numeric: true }));
       this.houses = [...houses.values()].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
-      this.health = { kind: 'herdr', scope: 'current-herdr-session', presence: 'fresh', error: null };
+      this.health = { kind: 'herdr', ...this.context, presence: 'fresh', error: null };
     } catch {
       if (this.stopped) return;
       // Failed/malformed reads are NOT an empty list: retain occupants and seats.
       this.members = this.members.map(s => ({ ...s, presence: 'stale' }));
       this.houses = this.houses.map(t => ({ ...t, presence: 'stale' }));
-      this.health = { kind: 'herdr', scope: 'current-herdr-session', presence: 'stale', error: 'Herdr 状态读取失败；保留上次快照，正在重试。' };
+      this.health = { kind: 'herdr', ...this.context, presence: 'stale', error: 'Herdr 状态读取失败；保留上次快照，正在重试。' };
     } finally {
       this.controller = null;
     }

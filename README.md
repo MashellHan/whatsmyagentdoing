@@ -1,8 +1,8 @@
 # 👀 whatsmyagentdoing
 
-> **Team Houses fork:** run `WMAD_NO_UPDATE_CHECK=1 node bin/cli.js --no-open --private --port 4546` from a Herdr-managed terminal. This fork adds a private, log-first local team neighborhood while keeping the original office/list/3D/PiP views. Updates and scene downloads are disabled. See [Team Houses](docs/TEAM-HOUSES.md). The upstream overview below is retained for reference.
+> **Team Houses fork:** run `node bin/cli.js --no-open --port 4546` from a Herdr-managed terminal, or use `node bin/cli.js --herdr-session default --no-open --port 4546` from another terminal after checking `herdr session list --json`. This fork adds a private, log-first local team neighborhood while keeping the original office/list/3D/PiP views. Updates and scene downloads are disabled. See [Team Houses](docs/TEAM-HOUSES.md). The upstream overview below is retained for reference.
 
-**A Claude Code / Codex skill: type `/myoffice` and see what every Claude Code, Codex and Gemini CLI agent on your machine is doing — live, in a little office.**
+**A Claude Code / Codex skill: invoke `/myoffice` in Claude Code or `$myoffice` in Codex to see what every Claude Code, Codex and Gemini CLI agent on your machine is doing — live, in a little office.**
 
 ![The 3D office: agents at their desks, off-duty ones wandering around](docs/office-3d.gif)
 
@@ -16,19 +16,21 @@
 
 **Easiest: ask your agent.** Paste this into Claude Code or Codex:
 
-> Install the myoffice skill from https://github.com/Charonyuu/whatsmyagentdoing: clone it with `git clone --depth 1` into `~/.claude/skills/myoffice` (for Codex: `~/.codex/skills/myoffice`), check that `node --version` is 18 or newer, then tell me to start a new session and type /myoffice.
+> Install the myoffice skill from https://github.com/MashellHan/whatsmyagentdoing into `~/.claude/skills/myoffice` (for Codex: `~/.codex/skills/myoffice`), check that `node --version` is 18 or newer, and tell me how to invoke it. Claude Code uses `/myoffice`; Codex uses `$myoffice` or `/skills`.
 
 Or do it yourself:
 
 ```bash
 # Claude Code
-git clone --depth 1 https://github.com/Charonyuu/whatsmyagentdoing ~/.claude/skills/myoffice
+git clone --depth 1 https://github.com/MashellHan/whatsmyagentdoing ~/.claude/skills/myoffice
 
 # Codex
-git clone --depth 1 https://github.com/Charonyuu/whatsmyagentdoing ~/.codex/skills/myoffice
+git clone --depth 1 https://github.com/MashellHan/whatsmyagentdoing ~/.codex/skills/myoffice
 ```
 
-Then type **`/myoffice`** (or just ask *"what are my agents doing?"*). The office opens in your browser. Update later with `git -C ~/.claude/skills/myoffice pull`.
+Then invoke **`/myoffice` in Claude Code** or **`$myoffice` in Codex**. For Herdr
+teams, use a Herdr terminal or select a running session with `--herdr-session`;
+see [Team Houses](docs/TEAM-HOUSES.md). `--logs` shows ungrouped local logs.
 
 Needs Node.js 18+. Nothing to `npm install` — the repo runs as cloned. Prefer no skill? `node bin/cli.js` from a clone works too.
 

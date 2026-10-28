@@ -46,6 +46,13 @@
   const houses = new Map();
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const singleColumn = matchMedia('(max-width: 760px)');
+  let layout = 'compact';
+  try { if (localStorage.getItem('agent-office-town-layout') === 'wide') layout = 'wide'; } catch {}
+  function updateLayout() {
+    document.body.dataset.layout = layout;
+    for (const button of $('townLayout').querySelectorAll('button')) button.setAttribute('aria-pressed', String(button.dataset.layout === layout));
+    scheduleLayout();
+  }
   const clock = '<svg class="freshness-clock" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/></svg>';
   const isStale = team => !connected || data.source?.presence === 'stale' || team.presence === 'stale';
   // Observe natural content, never the grid rows stretched by our measurement.
@@ -56,12 +63,13 @@
   function measureLayout() {
     layoutFrame = 0;
     const neighborhood = $('neighborhood');
-    neighborhood.dataset.rows = Math.ceil(houses.size / (singleColumn.matches ? 1 : 2));
+    const columns = getComputedStyle($('houses')).gridTemplateColumns.split(/\s+/).filter(Boolean).length;
+    neighborhood.dataset.columns = columns;
+    neighborhood.dataset.rows = Math.ceil(houses.size / columns);
     let height = parseFloat(getComputedStyle(neighborhood).getPropertyValue('--lot-min-height'));
     for (const house of houses.values()) {
       const offset = parseFloat(getComputedStyle(house).getPropertyValue('--lot-offset')) || 0;
-      height = Math.max(height, house.querySelector('.house-art-stage').offsetHeight +
-        house.querySelector('.house-sign').offsetHeight + 8 + offset + 8);
+      height = Math.max(height, house.offsetHeight + offset + 8);
     }
     const value = `${Math.ceil(height)}px`;
     if (neighborhood.style.getPropertyValue('--lot-height') !== value) neighborhood.style.setProperty('--lot-height', value);
@@ -91,9 +99,10 @@
   function houseArt(index) {
     const c = palette[index % palette.length];
     const clipId = `town-window-${++artSerial}`;
+    const lightId = `${clipId}-light`;
     // Hand-built vector architecture; all assets and typography stay local.
     return `<svg class="house-illustration" viewBox="0 0 320 250" aria-hidden="true">
-      <defs><clipPath id="${clipId}"><path d="m85 159 20 6v20l-20-6Z"/></clipPath></defs>
+      <defs><clipPath id="${clipId}"><path d="m83 157 26 8v26l-26-8Z"/></clipPath><radialGradient id="${lightId}"><stop stop-color="#ffd16c" stop-opacity=".9"/><stop offset=".5" stop-color="#ffd16c" stop-opacity=".4"/><stop offset="1" stop-color="#ffd16c" stop-opacity="0"/></radialGradient></defs>
       <ellipse cx="160" cy="224" rx="125" ry="16" fill="#bdcba9" opacity=".55"/>
       <g class="lot-garden">
         <path d="M5 195Q5 176 29 181L64 199Q66 221 41 222L15 212Z" fill="#b4c69b" stroke="#9db285"/>
@@ -110,19 +119,21 @@
       <path d="M65 142 100 75 174 132 166 173Z" fill="${c.roof}"/><path d="M100 75 174 35 252 124 174 167 174 132Z" fill="${c.dark}"/>
       <path d="m70 137 95 29m-79-61 79 30m-66-50 67 26m-52-24 69 23m-62-36 100 109" fill="none" stroke="#fff" opacity=".12" stroke-width="2"/>
       <path d="m100 75 74 57-8 35-94-28Z" fill="${c.wall}"/><path d="m66 140 34-65 74 57m-74-57 74-40 78 89-78 43" fill="none" stroke="${c.trim}" stroke-width="6" stroke-linejoin="round"/>
-      <path d="m107 109 19 6v20l-19-6Z" fill="${c.trim}"/><path class="window-glow" d="m110 113 13 4v13l-13-4Z"/><path d="m117 115v14" stroke="${c.trim}" stroke-width="2"/>
-      <path d="M82 155 108 163v27l-26-8Z" fill="${c.trim}"/><path class="window-glow" d="m85 159 20 6v20l-20-6Z"/><path d="m95 162v20m-11-13 22 7" stroke="${c.trim}" stroke-width="2"/>
+      <g class="window-light" fill="url(#${lightId})"><ellipse cx="116" cy="123" rx="26" ry="27"/><ellipse cx="96" cy="175" rx="32" ry="31"/><ellipse cx="202" cy="165" rx="32" ry="36"/><ellipse cx="156" cy="190" rx="17" ry="21"/></g>
+      <g class="upper-window"><path d="m103 104 27 8v28l-27-8Z" fill="${c.trim}"/><path class="window-glow" d="m108 110 18 6v18l-18-6Z"/><path d="m117 113v18m-9-12 18 6" stroke="${c.trim}" stroke-width="2"/></g>
+      <g class="front-window"><path d="m79 151 34 10v36l-34-10Z" fill="${c.trim}"/><path class="window-glow" d="m83 157 26 8v26l-26-8Z"/><path d="m96 161v26m-13-17 26 8" stroke="${c.trim}" stroke-width="2.2"/><path d="m85 159 22 7" stroke="#fff6cb" stroke-width="1.5"/></g>
       <path d="m126 171 23 7v36l-23-7Z" fill="#8f7555"/><path d="m130 176 15 5v15l-15-5Z" fill="#c8c4a1"/><circle cx="143" cy="203" r="1.6" fill="#f2d08a"/>
-      <path d="m188 160 24-13v27l-24 13Z" fill="${c.trim}"/><path class="window-glow" d="m191 162 18-10v19l-18 10Z"/><path d="m200 157v19m-10-6 20-11" stroke="${c.trim}" stroke-width="2"/>
-      <g class="window-clip" clip-path="url(#${clipId})"><g class="window-person" fill="#665f50"><circle cx="94" cy="170" r="2.5"/><path d="m92 173 4 1 1 6-6-2Z"/></g></g>
+      <g class="side-window"><path d="m184 153 35-19v42l-35 19Z" fill="${c.trim}"/><path class="window-glow" d="m189 157 25-14v30l-25 14Z"/><path d="m201 150v30m-12-8 25-14" stroke="${c.trim}" stroke-width="2.2"/><path d="m191 158 21-12" stroke="#fff6cb" stroke-width="1.5"/></g>
+      <g class="porch-lamp"><path d="m150 181 6-6 7 10Z" fill="#756548"/><path d="m152 182 9 3v13l-9-3Z" fill="#ffd66d" stroke="#8a724a" stroke-width="1.6"/><path d="m156 184v12" stroke="#fff1b1" stroke-width="2"/></g>
+      <g class="window-clip" clip-path="url(#${clipId})"><g class="window-person" fill="#765c3f"><circle cx="96" cy="172" r="3.5"/><path d="m93 176 6 2 2 9-10-3Z"/></g></g>
       <g class="closed-curtains" fill="#ddd4bb" stroke="#9a9078" stroke-width="1">
-        <path d="m85 159 20 6v20l-20-6Z"/><path d="m90 161v19m5-17v19m5-17v19"/>
-        <path d="m191 162 18-10v19l-18 10Z"/><path d="m196 159v19m5-22v19m4-21v18"/>
-        <path d="m110 113 13 4v13l-13-4Z"/><path d="m114 115v12m5-10v12"/>
+        <path d="m83 157 26 8v26l-26-8Z"/><path d="m89 159v26m7-24v26m7-24v26"/>
+        <path d="m189 157 25-14v30l-25 14Z"/><path d="m195 154v30m7-34v30m6-33v30"/>
+        <path d="m108 110 18 6v18l-18-6Z"/><path d="m114 112v18m6-16v18"/>
       </g>
       <g class="roof-pennant"><path d="M153 65V20" stroke="#6e715f" stroke-width="2"/><g class="flag-cloth"><path d="M154 21q10-4 23 1l-5 6 5 6q-13-5-23-1Z" fill="#f5eed9" stroke="#8d8875" stroke-width="1.3"/><path class="flag-mark" d="m158 26 5-1 6 2" fill="none" stroke="#766e58"/></g></g>
-      <path d="m211 82 0-41 15-8v46Z" fill="#9b8062"/><path d="m198 72 0-37 13 6v41Z" fill="#b5a07d"/><path d="m195 33 16-8 18 8-18 9Z" fill="#c9b594"/><path d="m201 33 10-5 11 5-11 5Z" fill="#7a705b"/>
-      <g class="smoke" fill="#f8f7ed" stroke="#c4c4b2" stroke-width=".7"><ellipse class="puff puff-one" cx="211" cy="20" rx="8" ry="5"/><ellipse class="puff puff-two" cx="211" cy="20" rx="10" ry="6"/><ellipse class="puff puff-three" cx="211" cy="20" rx="7" ry="5"/></g>
+      <g class="house-chimney"><path d="m209 40 22-12v46l-22 12Z" fill="#997455"/><path d="m190 31 19 9v46l-19-10Z" fill="#b99b74"/><path d="m191 47 18 8m-18 8 18 8m5-19 16-9m-16 24 16-9" fill="none" stroke="#876c50" stroke-width="1.7"/><path d="m185 29 23-12 29 12-25 15Z" fill="#dcc5a1" stroke="#aa906b" stroke-width="1.2"/><path d="m195 29 14-7 18 7-15 8Z" fill="#746047"/></g>
+      <g class="smoke"><g class="puff puff-one"><path d="M197 29c-10 0-14-10-7-15 0-9 13-12 19-5 9-5 20 0 18 8 8 7 2 14-7 13Z"/><path class="smoke-ridge" d="M194 19q5-6 11-2m6-4q8-2 11 5"/></g><g class="puff puff-two"><path d="M197 29c-10 0-14-10-7-15 0-9 13-12 19-5 9-5 20 0 18 8 8 7 2 14-7 13Z"/><path class="smoke-ridge" d="M194 19q5-6 11-2m6-4q8-2 11 5"/></g><g class="puff puff-three"><path d="M197 29c-10 0-14-10-7-15 0-9 13-12 19-5 9-5 20 0 18 8 8 7 2 14-7 13Z"/><path class="smoke-ridge" d="M194 19q5-6 11-2m6-4q8-2 11 5"/></g></g>
       <g class="activity-emblem" fill="#faf6e9" stroke="#777363" stroke-width="1.5"><circle cx="38" cy="110" r="12"/><text class="activity-emblem-text" x="38" y="116" text-anchor="middle" fill="#5c5a4e" stroke="none" font-family="Georgia,serif" font-size="19" font-weight="bold">↻</text></g>
       <path d="m77 193 83 26m6 3 75-39" stroke="#b4aa84" stroke-width="4"/>
       <path d="M86 191v9m10-6v9m-18-8 28 9" stroke="#c6b98e" stroke-width="3"/>
@@ -221,9 +232,17 @@
     updateMotion();
   }
   $('motion-toggle').addEventListener('click', () => { paused = !paused; updateMotion(); });
+  $('townLayout').addEventListener('click', event => {
+    const button = event.target.closest('button[data-layout]');
+    if (!button) return;
+    layout = button.dataset.layout;
+    try { localStorage.setItem('agent-office-town-layout', layout); } catch {}
+    updateLayout();
+  });
   reducedMotion.addEventListener('change', updateMotion);
   singleColumn.addEventListener('change', scheduleLayout);
   window.addEventListener('resize', scheduleLayout);
+  updateLayout();
   updateMotion();
   const events = new EventSource('/events');
   events.onopen = () => { connected = true; updateConnection(); };

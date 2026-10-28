@@ -10,6 +10,25 @@ From the current Herdr-managed terminal, using Node.js 18+:
 WMAD_NO_UPDATE_CHECK=1 node bin/cli.js --no-open --private --port 4546
 ```
 
+From a terminal outside Herdr, select a running session explicitly:
+
+```sh
+herdr session list --json
+node bin/cli.js --herdr-session default --no-open --port 4546
+```
+
+Use the session name returned by the list command; `default` is the built-in
+session name. Every workspace/agent read is routed through `herdr --session
+<name>`, including retries. The snapshot reports the selected session under
+`source.session`. This does not require setting `HERDR_ENV` or attaching a
+terminal. Without an explicit selection, Herdr mode still requires an inherited
+Herdr terminal context.
+
+`--logs` deliberately disables Herdr discovery and shows only ungrouped local
+logs. It cannot be combined with `--herdr-session`. To change an already-running
+dashboard from logs to teams, stop the exact port and restart with the chosen
+session; starting it again only reopens its current page.
+
 Open `http://127.0.0.1:4546`. No runtime dependency installation is needed. Only loopback is bound; a busy port fails instead of silently selecting another port. `--stop --port 4546` validates the Team Houses app identity and stops only that exact instance, never another original dashboard. Updates and downloads are disabled.
 
 ## Identity and activity
@@ -45,9 +64,15 @@ Lawns, shrubs, small flower beds and street trees stay clear of the artwork and 
 
 For safe sample images, run `HOMEPAGE_CAPTURE_FIXTURE=1 npm run capture:homepage` using an already installed browser. Without that flag the script reads only the local dashboard, and those outputs must remain private.
 
-## Wide desktop canvases
+## Compact overview and optional large canvases
 
-Desktop maps use the available window width, and house SVGs actually render at larger dimensions. Room canvases offer a full-width large stage (natural page scrolling) and a fit-to-window overview. The same room is contained without cropping, scaling geometry equally; small screens keep a compact stage with the roster below. PiP retains its own viewport and supports both original paths.
+The homepage defaults to a compact overview: four houses across on larger desktops, two compact cards across on smaller windows, and one column on phones. The layout adapts to natural text height, so long names remain readable. Use “放大街区” for the original neighborhood, or expand “状态说明” for counting details.
+
+Busy houses have larger chimneys, continuous billowing smoke, and larger windows with gently pulsing warm light. The compact view gives the houses more room while tightening the surrounding spacing on short screens. Manual pause, reduced-motion settings, and stale data retain a static pose.
+
+Offices default to “适应窗口”, fitting the complete room, controls, and legends within the desktop viewport. A long member roster scrolls inside its own panel. “放大查看” restores the large canvas with natural page scrolling. Small screens keep the roster below the room. PiP retains its own viewport and supports both original paths.
+
+`npm run test:compact` checks one-screen layouts at 1440×900, 1280×720, and 1024×768 for the homepage and both office renderers, switching back from large views, and mobile reflow.
 
 `npm run test:wide` measures actual person/furniture projection, full-room/label containment, 1440/1920/2560 widths, mobile and PiP sizes, DPR and pixel budgets. It uses synthetic fixtures only. Large canvases can exceed the viewport height: use page scrolling or select fit mode; 3D wheel zoom is disabled in large-stage mode so scrolling remains possible.
 
