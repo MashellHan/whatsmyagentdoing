@@ -51,7 +51,7 @@ h1 span { color: #9a6d30; }
 .plaza span { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); color: #625d48; font-size: 10px; white-space: nowrap; }
 .neighborhood[data-rows="0"] { display: none; }
 .neighborhood[data-rows="1"] .plaza, .neighborhood[data-rows="1"] .street-decor { display: none; }
-.house { --lot-offset: 0px; position: relative; z-index: 2; min-width: 0; align-self: start; display: flex; flex-direction: column; gap: 8px; border: 0; border-radius: 8px; background: transparent; padding: 0; text-align: center; cursor: pointer; transform: translateY(var(--lot-offset)); }
+.house { --lot-offset: 0px; --house-size: 1.06; position: relative; z-index: 2; min-width: 0; align-self: start; display: flex; flex-direction: column; gap: 8px; border: 0; border-radius: 8px; background: transparent; padding: 0; text-align: center; cursor: pointer; transform: translateY(var(--lot-offset)); }
 .house:focus-visible { z-index: 3; }
 .house-art-stage { display: block; padding-top: max(42px,calc(var(--art-height) * .18 + 12px)); }
 .house-illustration { display: block; width: 100%; height: var(--art-height); overflow: visible; transform: scale(var(--house-size, 1)); transform-origin: center bottom; transition: transform .25s; }
@@ -71,7 +71,12 @@ h1 span { color: #9a6d30; }
 .house-freshness { margin-top: 4px; }
 .freshness-clock { display: inline-block; vertical-align: -3px; width: 16px; height: 16px; margin-right: 4px; fill: none; stroke: currentColor; stroke-width: 1.5; }
 .house[data-stale=true] .house-sign { border-style: dashed; }
-.window-glow { fill: #ffe49a; stroke:#eac46b; stroke-width:1; }
+.window-glow { fill:#35443c; stroke:#26372d; stroke-width:1; }
+.lamp-glass { fill:#35443c; }
+.light-highlight { stroke:#68776b; }
+.house[data-activity=busy] .window-glow { fill:#ffe49a; stroke:#eac46b; }
+.house[data-activity=busy] .lamp-glass { fill:#ffd66d; }
+.house[data-activity=busy] .light-highlight { stroke:#fff6cb; }
 .window-light { opacity:.78; }
 .smoke { fill:#fffdf4; stroke:#a4b09e; stroke-width:1.2; stroke-linejoin:round; }
 .smoke-ridge { fill:none; stroke:#d5ddce; stroke-width:1.4; stroke-linecap:round; }

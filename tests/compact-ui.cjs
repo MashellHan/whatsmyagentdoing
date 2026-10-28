@@ -63,6 +63,8 @@ async function fits(page, name) {
       await page.setViewportSize({ width, height });
       measurements.push({ view: 'town', ...await fits(page, 'town ' + width) });
       assert.equal(await page.locator('.house').count(), 4);
+      const houseWidths = await page.locator('.house-chimney').evaluateAll(nodes => nodes.map(n => n.getBoundingClientRect().width));
+      assert.ok(Math.max(...houseWidths) - Math.min(...houseWidths) < 1, 'working and resting teams retain the same house size regardless of member count');
       await capture('town-' + width);
     }
     await page.setViewportSize({ width: 1440, height: 900 });

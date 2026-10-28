@@ -58,7 +58,7 @@ All public tests use synthetic data. Keep local mapping files, real status evide
 
 ## Accessible garden neighborhood
 
-Houses keep their team colors in every state. Busy houses emit continuous chimney puffs, move a rooftop flag and a clipped window silhouette. Idle houses close their curtains and show a sleeping cat and Zzz. Monochrome symbols and text also identify waiting, unknown and empty houses. Manual pause, system reduced-motion and stale snapshots use deterministic static alternatives while counts keep updating.
+Houses keep their roof and wall colors and their enlarged size in every state, regardless of member count. Busy houses light their windows and porch lamp, emit continuous chimney puffs, and move a rooftop flag and a clipped window silhouette. Other houses have dark windows and an unlit porch lamp. Idle houses close their curtains and show a sleeping cat and Zzz. Monochrome symbols and text also identify waiting, unknown and empty houses. Manual pause, system reduced-motion and stale snapshots use deterministic static alternatives while counts keep updating.
 
 Lawns, shrubs, small flower beds and street trees stay clear of the artwork and naturally-sized signs. Layout measurements handle long text and one-column mobile streets. `npm run test:town` checks five states, same-house colors, 12-second motion continuity, stale/reduce/pause, 13-house layouts and 200% text.
 
@@ -68,7 +68,7 @@ For safe sample images, run `HOMEPAGE_CAPTURE_FIXTURE=1 npm run capture:homepage
 
 The homepage defaults to a compact overview: four houses across on larger desktops, two compact cards across on smaller windows, and one column on phones. The layout adapts to natural text height, so long names remain readable. Use “放大街区” for the original neighborhood, or expand “状态说明” for counting details.
 
-Busy houses have larger chimneys, continuous billowing smoke, and larger windows with gently pulsing warm light. The compact view gives the houses more room while tightening the surrounding spacing on short screens. Manual pause, reduced-motion settings, and stale data retain a static pose.
+All houses share the larger size, chimneys, and windows. Busy houses add continuous billowing smoke and gently pulsing warm light. The compact view gives the houses more room while tightening the surrounding spacing on short screens. Manual pause, reduced-motion settings, and stale data retain a static pose.
 
 Offices default to “适应窗口”, fitting the complete room, controls, and legends within the desktop viewport. A long member roster scrolls inside its own panel. “放大查看” restores the large canvas with natural page scrolling. Small screens keep the roster below the room. PiP retains its own viewport and supports both original paths.
 

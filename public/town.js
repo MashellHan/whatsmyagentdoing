@@ -121,12 +121,12 @@
       <path d="m100 75 74 57-8 35-94-28Z" fill="${c.wall}"/><path d="m66 140 34-65 74 57m-74-57 74-40 78 89-78 43" fill="none" stroke="${c.trim}" stroke-width="6" stroke-linejoin="round"/>
       <g class="window-light" fill="url(#${lightId})"><ellipse cx="116" cy="123" rx="26" ry="27"/><ellipse cx="96" cy="175" rx="32" ry="31"/><ellipse cx="202" cy="165" rx="32" ry="36"/><ellipse cx="156" cy="190" rx="17" ry="21"/></g>
       <g class="upper-window"><path d="m103 104 27 8v28l-27-8Z" fill="${c.trim}"/><path class="window-glow" d="m108 110 18 6v18l-18-6Z"/><path d="m117 113v18m-9-12 18 6" stroke="${c.trim}" stroke-width="2"/></g>
-      <g class="front-window"><path d="m79 151 34 10v36l-34-10Z" fill="${c.trim}"/><path class="window-glow" d="m83 157 26 8v26l-26-8Z"/><path d="m96 161v26m-13-17 26 8" stroke="${c.trim}" stroke-width="2.2"/><path d="m85 159 22 7" stroke="#fff6cb" stroke-width="1.5"/></g>
-      <path d="m126 171 23 7v36l-23-7Z" fill="#8f7555"/><path d="m130 176 15 5v15l-15-5Z" fill="#c8c4a1"/><circle cx="143" cy="203" r="1.6" fill="#f2d08a"/>
-      <g class="side-window"><path d="m184 153 35-19v42l-35 19Z" fill="${c.trim}"/><path class="window-glow" d="m189 157 25-14v30l-25 14Z"/><path d="m201 150v30m-12-8 25-14" stroke="${c.trim}" stroke-width="2.2"/><path d="m191 158 21-12" stroke="#fff6cb" stroke-width="1.5"/></g>
-      <g class="porch-lamp"><path d="m150 181 6-6 7 10Z" fill="#756548"/><path d="m152 182 9 3v13l-9-3Z" fill="#ffd66d" stroke="#8a724a" stroke-width="1.6"/><path d="m156 184v12" stroke="#fff1b1" stroke-width="2"/></g>
+      <g class="front-window"><path d="m79 151 34 10v36l-34-10Z" fill="${c.trim}"/><path class="window-glow" d="m83 157 26 8v26l-26-8Z"/><path d="m96 161v26m-13-17 26 8" stroke="${c.trim}" stroke-width="2.2"/><path class="light-highlight" d="m85 159 22 7" stroke-width="1.5"/></g>
+      <path d="m126 171 23 7v36l-23-7Z" fill="#8f7555"/><path class="window-glow" d="m130 176 15 5v15l-15-5Z"/><circle cx="143" cy="203" r="1.6" fill="#f2d08a"/>
+      <g class="side-window"><path d="m184 153 35-19v42l-35 19Z" fill="${c.trim}"/><path class="window-glow" d="m189 157 25-14v30l-25 14Z"/><path d="m201 150v30m-12-8 25-14" stroke="${c.trim}" stroke-width="2.2"/><path class="light-highlight" d="m191 158 21-12" stroke-width="1.5"/></g>
+      <g class="porch-lamp"><path d="m150 181 6-6 7 10Z" fill="#756548"/><path class="lamp-glass" d="m152 182 9 3v13l-9-3Z" stroke="#8a724a" stroke-width="1.6"/><path class="light-highlight" d="m156 184v12" stroke-width="2"/></g>
       <g class="window-clip" clip-path="url(#${clipId})"><g class="window-person" fill="#765c3f"><circle cx="96" cy="172" r="3.5"/><path d="m93 176 6 2 2 9-10-3Z"/></g></g>
-      <g class="closed-curtains" fill="#ddd4bb" stroke="#9a9078" stroke-width="1">
+      <g class="closed-curtains" fill="#445047" stroke="#2d3932" stroke-width="1">
         <path d="m83 157 26 8v26l-26-8Z"/><path d="m89 159v26m7-24v26m7-24v26"/>
         <path d="m189 157 25-14v30l-25 14Z"/><path d="m195 154v30m7-34v30m6-33v30"/>
         <path d="m108 110 18 6v18l-18-6Z"/><path d="m114 112v18m6-16v18"/>
@@ -165,7 +165,6 @@
       house.dataset.working = a.busy;
       house.dataset.total = a.total;
       house.querySelector('.activity-emblem-text').textContent = ACTIVITY_SYMBOLS[a.kind];
-      house.style.setProperty('--house-size', String(Math.min(1.06, .79 + Math.sqrt(a.total) * .07)));
       const name = team.name || team.label || team.id;
       const issues = [a.attention ? `${a.attention} 位等待处理` : '', a.unknown ? `${a.unknown} 位状态未明` : ''].filter(Boolean);
       const note = issues.length ? issues.join(' · ') : a.kind === 'idle' ? '窗帘合上，小猫打盹' : a.kind === 'empty' ? '房子还在，等成员回来' : '烟囱冒烟，小旗飘动';

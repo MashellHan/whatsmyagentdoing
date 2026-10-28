@@ -99,9 +99,11 @@ async function layoutCheck(page, width) {
     const waitKind = kind => page.waitForFunction(kind => document.querySelector('[data-team-id=w1]').dataset.activity === kind, kind);
     const style = id => house(id).evaluate(el => {
       const s = selector => getComputedStyle(el.querySelector(selector));
+      const art = el.querySelector('.house-illustration').getBoundingClientRect();
       return {
-        materials: [...el.querySelectorAll('.house-illustration path, .house-illustration ellipse, .house-illustration circle')].map(n => [getComputedStyle(n).fill, getComputedStyle(n).stroke]),
-        card: ['.house-sign','.house-name','.status-chip','.busy-ratio','.window-glow'].map(q => [s(q).color,s(q).backgroundColor,s(q).borderColor,s(q).fill,s(q).boxShadow]),
+        materials: [...el.querySelectorAll('.house-illustration path, .house-illustration ellipse, .house-illustration circle')].filter(n => !n.matches('.window-glow,.lamp-glass,.light-highlight')).map(n => [getComputedStyle(n).fill, getComputedStyle(n).stroke]),
+        card: ['.house-sign','.house-name','.status-chip','.busy-ratio'].map(q => [s(q).color,s(q).backgroundColor,s(q).borderColor,s(q).fill,s(q).boxShadow]),
+        size: [art.width, art.height],
         ancestors: [el,el.querySelector('.house-art-stage'),el.querySelector('.house-illustration'),el.parentElement,el.parentElement.parentElement].map(n => [getComputedStyle(n).filter,getComputedStyle(n).opacity]),
       };
     });
@@ -155,7 +157,12 @@ async function layoutCheck(page, width) {
     console.log('PASS 12s continuous busy motion', JSON.stringify(motion));
     for (const [kind, states] of [['idle',Array(5).fill('done')], ['attention',Array(5).fill('waiting')], ['unknown',Array(5).fill('unknown')], ['empty',[]], ['busy',Array(5).fill('tool')]]) {
       await setStates(states); await waitKind(kind);
-      assert.deepEqual(await style('w1'), baseline, `same-house palette ${kind}`);
+      assert.deepEqual(await style('w1'), baseline, `same-house architecture and size ${kind}`);
+      const brightness = await house('w1').locator('.window-glow,.lamp-glass').evaluateAll(nodes => nodes.map(n => {
+        const [r,g,b] = getComputedStyle(n).fill.match(/[\d.]+/g).map(Number);
+        return .2126*r + .7152*g + .0722*b;
+      }));
+      assert.ok(brightness.every(value => kind === 'busy' ? value > 180 : value < 90), `${kind} window and porch lighting: ${brightness}`);
       assert.equal(await house('w1').locator('.state-symbol').innerText(), symbols[kind]);
       assert.equal(await visibility('w1','.smoke'), kind === 'busy' ? 'visible' : 'hidden');
       assert.equal(await visibility('w1','.window-light'), kind === 'busy' ? 'visible' : 'hidden');
