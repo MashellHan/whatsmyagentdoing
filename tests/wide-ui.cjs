@@ -155,6 +155,7 @@ async function assertLabelPicking(page, name) {
     });
     const page=await context.newPage(), measured={town:[],mid:[],high:[]};
     await page.goto(base); await page.waitForSelector('.house');
+    await page.locator('.town-view-controls [data-town-view=expanded]').click(); await settle(page);
     for(const width of [1440,1920,2560]) {
       await page.setViewportSize({width,height:900}); await settle(page);
       measured.town.push(await page.locator('.house').first().evaluate(n=>{

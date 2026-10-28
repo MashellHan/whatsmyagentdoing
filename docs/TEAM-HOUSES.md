@@ -47,7 +47,11 @@ For safe sample images, run `HOMEPAGE_CAPTURE_FIXTURE=1 npm run capture:homepage
 
 ## Wide desktop canvases
 
-Desktop maps use the available window width, and house SVGs actually render at larger dimensions. Room canvases offer a full-width large stage (natural page scrolling) and a fit-to-window overview. The same room is contained without cropping, scaling geometry equally; small screens keep a compact stage with the roster below. PiP retains its own viewport and supports both original paths.
+Desktop maps default to a compact first-screen overview: houses sit beside their complete signs, with four ordinary houses visible from 1280×720 upward. Select **展开街区** to restore the larger neighborhood, or **首屏总览** to return. Reload starts in overview mode. At 1050px and below the original tablet/mobile layout is unchanged. Long names, enlarged text and larger teams of houses grow naturally down the page; content is never hidden to force a fit.
+
+The expanded map uses the available window width, and house SVGs actually render at larger dimensions. This homepage toggle does not affect rooms. Room canvases offer a full-width large stage (natural page scrolling) and a fit-to-window overview. The same room is contained without cropping, scaling geometry equally; small screens keep a compact stage with the roster below. PiP retains its own viewport and supports both original paths.
+
+`npm run test:town` includes first-screen checks at 1280×720, 1366×768, 1440×900, 1920×1080 and 2560×1440, keyboard toggling, 44px controls, responsive breakpoints, 200% text, long names, zero/13 houses and external-request detection. Set `WMAD_OVERVIEW_SCREENSHOTS` to a local output directory to capture synthetic overview images.
 
 `npm run test:wide` measures actual person/furniture projection, full-room/label containment, 1440/1920/2560 widths, mobile and PiP sizes, DPR and pixel budgets. It uses synthetic fixtures only. Large canvases can exceed the viewport height: use page scrolling or select fit mode; 3D wheel zoom is disabled in large-stage mode so scrolling remains possible.
 

@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/town.css">
   <script src="/town.js" defer></script>
 </head>
-<body>
+<body data-town-view="overview">
   <header class="site-header">
     <a class="brand" href="/" aria-label="团队小镇首页"><span class="brand-mark">⌂</span><span>Agent Office<small>团队小镇 / LOCAL EDITION</small></span></a>
     <div class="header-meta"><a href="/office?view=office">全部办公室</a><a href="/office?view=list">全部列表</a><span class="privacy">▣ 隐私模式</span><span class="connection" id="connection" role="status">正在连接…</span></div>
@@ -20,7 +20,7 @@
         <div class="overview" aria-label="团队活动总览"><span id="summary-freshness" class="summary-freshness">正在读取状态…</span><div class="town-stats"><div><strong id="busy-team-count">—</strong><span><i class="stat-symbol" aria-hidden="true">↻</i>团队在忙</span></div><div><strong id="idle-team-count">—</strong><span><i class="stat-symbol" aria-hidden="true">Zzz</i>团队全闲</span></div><div><strong id="working-count">—</strong><span>正在工作的 agent</span></div></div><p id="overview-note">等待本机快照</p></div>
       </div>
       <div class="town-map">
-        <div class="map-caption"><span>⌖ LOCAL · 团队街区</span><span id="map-note">NEIGHBORHOOD MAP <i>↑ N</i></span></div>
+        <div class="map-caption"><span>⌖ LOCAL · 团队街区</span><div class="town-view-controls" role="group" aria-label="小镇显示范围"><button type="button" data-town-view="overview" aria-pressed="true">首屏总览</button><button type="button" data-town-view="expanded" aria-pressed="false">展开街区</button></div><span id="map-note">NEIGHBORHOOD MAP <i>↑ N</i></span></div>
         <div id="neighborhood" class="neighborhood">
           <div class="streets" aria-hidden="true"><div class="avenue"><span>TEAM LANE</span></div><div class="plaza"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#e9e0c8" stroke="#c1b697" stroke-width="2"/><circle cx="50" cy="50" r="29" fill="#b3cbbd" stroke="#8eae9d" stroke-width="5"/><ellipse cx="50" cy="54" rx="19" ry="11" fill="none" stroke="#dce8d9" stroke-width="2"/><path d="M50 61V33m0 0c-11-9-15 1-15 7m15-7c11-9 15 1 15 7" fill="none" stroke="#edf1df" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="62" r="6" fill="#91ada0"/></svg><span>小镇广场</span></div></div>
           <div id="houses" class="houses" aria-label="团队房屋"></div>

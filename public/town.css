@@ -205,3 +205,51 @@ body[data-motion-static=true] *, .house[data-static=true] * { transition: none !
 @media (max-width:380px) {
   .house-meta { align-items: flex-start; flex-direction: column; }
 }
+
+/* L1 is a compact overview by default; L2's large office is unchanged.
+   Natural content can grow for long names/zoom or many houses, never clipped. */
+.town-view-controls { display:flex; gap:2px; padding:2px; border:1px solid #a9b39c; border-radius:5px; background:#f4f2e7; }
+.town-view-controls button { min-height:44px; border:0; background:transparent; border-radius:3px; padding:4px 11px; color:#5d6053; font-size:11px; cursor:pointer; }
+.town-view-controls button[aria-pressed=true] { background:#e2e5d8; color:#293c33; box-shadow:inset 0 0 0 1px #a9b39c; }
+@media (min-width:1051px) {
+  body[data-town-view=overview] .site-header { padding-block:10px; }
+  body[data-town-view=overview] .intro { padding-block:15px; gap:24px; }
+  body[data-town-view=overview] .eyebrow, body[data-town-view=overview] .intro-copy { display:none; }
+  body[data-town-view=overview] h1 { font-size:27px; }
+  body[data-town-view=overview] .town-stats { padding-top:5px; gap:20px; }
+  body[data-town-view=overview] .town-stats strong { font-size:29px; }
+  body[data-town-view=overview] .town-stats span { margin-top:4px; }
+  body[data-town-view=overview] #overview-note { margin-top:5px; }
+  body[data-town-view=overview] .map-caption { padding-block:6px; }
+  body[data-town-view=overview] .map-footer { padding-block:8px; font-size:10px; }
+  body[data-town-view=overview] .neighborhood {
+    --lot-min-height:0px; --street-gap:52px; --avenue-width:76px; --road-width:40px;
+    padding:8px 8px 12px;
+  }
+  body[data-town-view=overview] .house {
+    --side-by-side:1; --lot-offset:0px;
+    display:grid; grid-template-columns:minmax(120px,.85fr) minmax(220px,1.15fr);
+    align-items:center; gap:10px; margin:0; container-type:normal;
+  }
+  body[data-town-view=overview] .house:nth-child(even) { --lot-offset:8px; }
+  body[data-town-view=overview] .house-art-stage { --art-height:clamp(132px,18vh,190px); padding-top:24px; min-width:0; }
+  body[data-town-view=overview] .house-sign { width:100%; min-height:0; padding:9px 12px; text-align:left; }
+  body[data-town-view=overview] .house-name { min-height:0; line-height:20px; font-size:14px; }
+  body[data-town-view=overview] .house-meta { margin-top:6px; gap:4px; }
+  body[data-town-view=overview] .house-note { min-height:0; }
+  body[data-town-view=overview] .house-divider { margin-block:6px; }
+  body[data-town-view=overview] .plaza { width:44px; }
+  body[data-town-view=overview] .plaza span { display:none; }
+  body[data-town-view=overview] .street-tree { top:8px; width:30px; height:36px; }
+  body[data-town-view=overview] .street-lamp { top:10px; }
+  body[data-town-view=overview] .street-bench { top:20px; }
+  body[data-town-view=overview] .green-borders { display:none; }
+  body[data-town-view=overview] .legend { margin-top:12px; }
+  body[data-town-view=overview] .motion-controls { margin-block:6px; }
+}
+@media (min-width:1051px) and (max-width:1250px) {
+  body[data-town-view=overview] .neighborhood { --avenue-width:56px; padding-inline:0; }
+  body[data-town-view=overview] .house { grid-template-columns:minmax(95px,.65fr) minmax(210px,1.35fr); gap:4px; }
+  body[data-town-view=overview] .house-sign { padding-inline:9px; }
+}
+@media (max-width:1050px) { .town-view-controls { display:none; } }

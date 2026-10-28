@@ -88,6 +88,8 @@ async function layoutCheck(page, width) {
       window.EventSource = class extends Native { constructor(...args) { super(...args); window.fixtureEvents = this; } };
     });
     await page.goto(base); await page.waitForSelector('[data-testid=house]'); await settle(page);
+    // Detailed garden geometry retains its own explicit expanded mode.
+    await page.locator('.town-view-controls [data-town-view=expanded]').click(); await settle(page);
     const house = id => page.locator(`[data-team-id="${id}"]`);
     const emit = async () => { source.emit('change'); await settle(page); };
     const setStates = async statuses => {

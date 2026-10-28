@@ -59,9 +59,11 @@
     neighborhood.dataset.rows = Math.ceil(houses.size / (singleColumn.matches ? 1 : 2));
     let height = parseFloat(getComputedStyle(neighborhood).getPropertyValue('--lot-min-height'));
     for (const house of houses.values()) {
-      const offset = parseFloat(getComputedStyle(house).getPropertyValue('--lot-offset')) || 0;
-      height = Math.max(height, house.querySelector('.house-art-stage').offsetHeight +
-        house.querySelector('.house-sign').offsetHeight + 8 + offset + 8);
+      const style = getComputedStyle(house);
+      const offset = parseFloat(style.getPropertyValue('--lot-offset')) || 0;
+      const sideBySide = style.getPropertyValue('--side-by-side').trim() === '1';
+      const art = house.querySelector('.house-art-stage').offsetHeight, sign = house.querySelector('.house-sign').offsetHeight;
+      height = Math.max(height, (sideBySide ? Math.max(art, sign) : art + sign + 8) + offset + 8);
     }
     const value = `${Math.ceil(height)}px`;
     if (neighborhood.style.getPropertyValue('--lot-height') !== value) neighborhood.style.setProperty('--lot-height', value);
@@ -221,6 +223,14 @@
     updateMotion();
   }
   $('motion-toggle').addEventListener('click', () => { paused = !paused; updateMotion(); });
+  document.querySelector('.town-view-controls').addEventListener('click', event => {
+    const button = event.target.closest('[data-town-view]');
+    if (!button) return;
+    const townView = button.dataset.townView;
+    document.body.dataset.townView = townView;
+    for (const item of document.querySelectorAll('.town-view-controls button')) item.setAttribute('aria-pressed', String(item.dataset.townView === townView));
+    scheduleLayout();
+  });
   reducedMotion.addEventListener('change', updateMotion);
   singleColumn.addEventListener('change', scheduleLayout);
   window.addEventListener('resize', scheduleLayout);
