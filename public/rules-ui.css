@@ -1,7 +1,10 @@
 /* Isolated reader styles: no changes to stage, renderer, roster or PiP layout. */
-.rules-entry { min-height:44px; min-width:44px; display:inline-flex; align-items:center; gap:7px; }
+.rules-entry { min-height:44px; min-width:44px; display:inline-flex; align-items:center; gap:7px; width:100%; justify-content:center; margin-bottom:14px; }
 .rules-entry-icon { font-size:18px; }
-.rules-dialog { box-sizing:border-box; width:min(1120px,calc(100vw - 64px)); height:min(840px,calc(100dvh - 64px)); max-width:none; max-height:none; padding:0; border:1px solid var(--line); border-radius:14px; color:var(--ink); background:var(--panel); box-shadow:0 24px 80px #0004; overflow:hidden; }
+.rules-dialog { box-sizing:border-box; width:min(1480px,calc(100vw - 48px)); height:min(1040px,calc(100dvh - 48px)); max-width:calc(100vw - 32px); max-height:calc(100dvh - 32px); padding:0; border:1px solid var(--line); border-radius:14px; color:var(--ink); background:var(--panel); box-shadow:0 24px 80px #0004; overflow:hidden; }
+.rules-dialog[data-maximized=true] { width:calc(100vw - 32px); height:calc(100dvh - 32px); }
+.rules-dialog .rules-resize { position:absolute; right:0; bottom:0; min-height:32px; height:32px; padding:0; border:0; border-radius:0; cursor:nwse-resize; touch-action:none; color:var(--muted); background:var(--panel); font-size:20px; }
+.rules-dialog[data-maximized=true] .rules-resize { display:none; }
 .rules-dialog[open] { display:flex; flex-direction:column; }
 .rules-dialog::backdrop { background:#171b22a6; }
 .rules-dialog * { box-sizing:border-box; min-width:0; }
@@ -32,7 +35,7 @@
 .rules-dialog .rules-back { display:none; }
 .rules-path { margin:0 0 6px; font-size:16px; line-height:1.5; overflow-wrap:anywhere; }
 .rules-meta { margin:0 0 22px; font-size:12px; color:var(--muted); overflow-wrap:anywhere; }
-.rules-body { max-width:72ch; margin:0 auto; font-size:15px; line-height:1.7; overflow-wrap:anywhere; }
+.rules-body { max-width:88ch; margin:0 auto; font-size:16px; line-height:1.85; overflow-wrap:anywhere; }
 .rules-body h1, .rules-body h2, .rules-body h3, .rules-body h4, .rules-body h5, .rules-body h6 { display:block; margin:1.3em 0 .6em; font-family:inherit; font-weight:650; letter-spacing:normal; line-height:1.4; text-transform:none; color:var(--ink); }
 .rules-body h1 { font-size:24px; }
 .rules-body h2 { font-size:21px; }
@@ -52,14 +55,15 @@
 .rules-notice, .rules-warning { font-size:13px; line-height:1.7; overflow-wrap:anywhere; }
 .rules-notice { color:var(--muted); }
 .rules-warning { padding:9px; border:1px dashed var(--muted); border-radius:5px; }
-.rules-status { flex:none; margin:0; min-height:38px; max-height:88px; overflow:auto; padding:10px 22px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+.rules-status { flex:none; margin:0; min-height:38px; max-height:88px; overflow:auto; padding:10px 52px 10px 22px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
 @media (min-width:761px) and (max-width:1023px) {
   .rules-dialog { width:calc(100vw - 32px); height:calc(100dvh - 32px); }
   .rules-shell { grid-template-columns:216px minmax(0,1fr); }
   .rules-reader { padding-inline:18px; }
 }
 @media (max-width:760px) {
-  .rules-dialog { width:100%; height:100dvh; margin:0; border:0; border-radius:0; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .rules-dialog, .rules-dialog[data-maximized=true] { width:100%!important; height:100dvh!important; max-width:100%; max-height:100dvh; inset:0!important; margin:0!important; border:0; border-radius:0; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .rules-dialog .rules-resize, .rules-maximize { display:none; }
   .rules-header { display:grid; grid-template-columns:minmax(0,1fr) auto; padding:12px 14px; gap:8px 10px; }
   .rules-heading h2 { font-size:18px; }
   .rules-local { grid-column:1; font-size:11px; }
@@ -71,7 +75,7 @@
   .rules-dialog .rules-back { display:block; }
   .rules-reader-tools { justify-content:flex-start; }
   .rules-reader-tools > :last-child { margin-left:auto; }
-  .rules-body { font-size:14px; }
+  .rules-body { font-size:16px; }
   .rules-status { padding-inline:14px; }
 }
 @media (prefers-reduced-motion:reduce) {

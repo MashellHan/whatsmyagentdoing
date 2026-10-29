@@ -99,3 +99,51 @@ test('rules HTTP is same-origin, custom-header, no-store and never included in S
   const state = JSON.stringify(snapshot(watcher)); assert.doesNotMatch(state, /Fixture rules|AGENTS|rootIdentity|root|files/);
   assert.equal((await fetch(base + '/api/rules/file?team=other&id=' + list.files[0].id, { headers })).status, 404);
 });
+
+test('member file IDs cannot cross members or team scope, and occupant changes invalidate them', async t => {
+  const f = fixture(t);
+  let occupant = 'first';
+  const reader = new RulesReader((team, member) => team === 'fixture' ? {
+    directories: [f.root], roots: [], extraFiles: [], memberKey: member, occupant,
+  } : null);
+  const a = await reader.list('fixture', 'member-a'), b = await reader.list('fixture', 'member-b');
+  const fileA = a.files.find(f => f.path === 'AGENTS.md'), fileB = b.files.find(f => f.path === 'AGENTS.md');
+  assert.notEqual(fileA.id, fileB.id);
+  await assert.rejects(reader.read('fixture', fileA.id, 'member-b'), /not_found/);
+  await assert.rejects(reader.read('fixture', fileA.id), /not_found/);
+  assert.match((await reader.read('fixture', fileA.id, 'member-a')).content, /Fixture rules/);
+  occupant = 'replacement';
+  await assert.rejects(reader.read('fixture', fileA.id, 'member-a'), /scope_changed/);
+});
+
+test('exact ancestor and skill instructions admit observed rules without broadening to arbitrary files or links', async t => {
+  const f = fixture(t), root = fs.realpathSync(f.root), parent = path.dirname(root);
+  const write = (file, text) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text); };
+  write(path.join(parent, 'AGENTS.md'), 'SHARED_ANCESTOR');
+  write(path.join(parent, '.agents/team/playbook.md'), 'TEAM_PLAYBOOK');
+  write(path.join(parent, '.agents/team/roles/reviewer.md'), 'OBSERVED_REVIEWER');
+  write(path.join(root, '.agents/team/roles/implementer.md'), 'ASSIGNED_IMPLEMENTER');
+  write(path.join(parent, '.codex/skills/check/SKILL.md'), 'OBSERVED_SKILL');
+  write(path.join(parent, 'private.md'), 'OUTSIDE_PRIVATE_SENTINEL');
+  fs.symlinkSync(path.join(parent, 'private.md'), path.join(parent, '.agents/team/roles/symlink.md'));
+  const reader = new RulesReader(() => ({ directories: [root], roots: [], extraFiles: ['.agents/team/roles/implementer.md'],
+    memberFiles: ['.agents/team/roles/implementer.md'], instructionRoots: [
+      { root: parent, label: 'Ancestor', files: [
+        { path: 'AGENTS.md' }, { path: '.agents/team/playbook.md' },
+        { path: '.agents/team/roles/reviewer.md', association: 'observed' },
+        { path: '.agents/team/roles/symlink.md', association: 'observed' },
+        { path: 'private.md' }, { path: '../outside/SECRET.md' },
+      ] },
+      { root: path.join(parent, '.codex'), label: 'Skills', files: [{ path: 'skills/check/SKILL.md', association: 'observed' }] },
+    ] }));
+  const list = await reader.list('fixture', 'reviewer');
+  assert.equal(list.files.find(f => f.path.endsWith('reviewer.md')).association, 'observed');
+  assert.equal(list.files.find(f => f.path.endsWith('implementer.md')).association, 'configured');
+  assert.ok(list.files.some(f => f.path === 'skills/check/SKILL.md'));
+  assert.ok(list.files.some(f => f.path === '.agents/team/playbook.md'));
+  for (const file of list.files) assert.doesNotMatch((await reader.read('fixture', file.id, 'reviewer')).content, /SENTINEL/);
+  assert.ok(list.warnings.includes('invalid_instruction_file'));
+  const skill = list.files.find(f => f.path.endsWith('SKILL.md'));
+  const dir = path.join(parent, '.codex/skills/check'); fs.renameSync(dir, dir + '-old'); fs.symlinkSync(f.outside, dir);
+  await assert.rejects(reader.read('fixture', skill.id, 'reviewer'));
+});

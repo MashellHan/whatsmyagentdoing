@@ -15,6 +15,7 @@ const { Magpie } = require('./magpie');
 const { clientFiles, metadata, applyKimi, applyDsh, applyGrok, readDsh } = require('./clients');
 const { ompDirs } = require('./omp');
 const hook = require('./hook');
+const { RecentActivity } = require('./activity');
 
 const HEAD_BYTES = 128 * 1024;
 const TAIL_BYTES = 768 * 1024;
@@ -374,7 +375,7 @@ class Watcher extends EventEmitter {
     session.mtime = st.mtimeMs;
     if (c.agent === 'gemini') session.geminiProject = c.project;
     const apply = { claude: applyClaude, codex: applyCodex, gemini: applyGemini, copilot: applyCopilot, kimi: applyKimi, dsh: applyDsh, grok: applyGrok, omp: applyOMP }[c.agent];
-    const t = { session, offset: st.size, partial: '', apply, mtime: st.mtimeMs };
+    const t = { session, offset: st.size, partial: '', apply, mtime: st.mtimeMs, recent: new RecentActivity() };
     if (c.agent === 'dsh') {
       t.whole = true;
       t.readAt = Date.now();
@@ -410,7 +411,11 @@ class Watcher extends EventEmitter {
     }
     if (c.agent === 'gemini' && c.file.endsWith('.json')) {
       t.whole = true;
-      try { applyGeminiDocument(session, JSON.parse(readRange(c.file, 0, st.size))); } catch {}
+      try {
+        const doc = JSON.parse(readRange(c.file, 0, st.size));
+        applyGeminiDocument(session, doc);
+        for (const message of doc.messages || []) t.recent.observe(session, message);
+      } catch {}
       this.trackers.set(c.file, t);
       return t;
     }
@@ -475,7 +480,9 @@ class Watcher extends EventEmitter {
       if (!line) continue;
       let d;
       try { d = JSON.parse(line); } catch { continue; }
+      const seeded = t.session.agent === 'dsh' && t.session._seed > 0;
       try { t.apply(t.session, d); } catch {}
+      if (!seeded) { try { t.recent?.observe(t.session, d); } catch {} }
     }
   }
 
@@ -505,6 +512,15 @@ class Watcher extends EventEmitter {
     const changed = key(next) !== key(this.waiting);
     this.waiting = next;
     return changed;
+  }
+
+  // Uses the canonical log key already selected by joinSessions. Ambiguous or
+  // remote-only matches cannot expose another session's private observations.
+  localDetails(logKey) {
+    const matches = [...this.trackers.values()].filter(t => `${t.session.agent}:${t.session.id}` === logKey);
+    if (matches.length !== 1 || !matches[0].recent) return null;
+    const t = matches[0];
+    return { ...t.recent.snapshot(), documents: [...t.recent.documents], updatedAt: t.session.mtime || t.session.lastEventAt };
   }
 
   sessions() {

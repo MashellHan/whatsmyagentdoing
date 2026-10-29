@@ -521,6 +521,26 @@ function roleBadge(s) {
   const label = { leader: '★ leader', dev: 'dev', designer: 'designer' }[s.role];
   return label ? `<span class="role-label">${label}</span>` : '';
 }
+let memberUI = null;
+function configurationTags(s) {
+  if (state.data.source?.kind === 'remote') return '';
+  const tags = [];
+  const window = s.contextWindow || s.context?.window;
+  if (!s.model && !s.reasoningEffort && !window) return '<span class="member-config"><span class="config-tag unknown" title="尚未从此成员的会话日志读取到模型、推理强度或上下文配置">会话配置未记录</span></span>';
+  if (s.model) tags.push(`<span class="config-tag" title="会话记录的模型：${esc(s.model)}">${esc(s.model)}</span>`);
+  else tags.push('<span class="config-tag unknown">模型未记录</span>');
+  tags.push(s.reasoningEffort
+    ? `<span class="config-tag" title="会话记录的推理强度">推理 ${esc(s.reasoningEffort)}</span>`
+    : '<span class="config-tag unknown">推理未记录</span>');
+  if (window) {
+    const estimated = s.contextWindowSource === 'estimated';
+    const used = s.context?.used;
+    const title = `${estimated ? '估计的上下文窗口' : '会话记录的上下文窗口'}：${window.toLocaleString()} tokens${used ? `；已用 ${used.toLocaleString()} (${Math.round(100 * used / window)}%)` : ''}`;
+    const size = window >= 1e6 ? `${+(window / 1e6).toFixed(2)}M` : window >= 1000 ? `${+(window / 1000).toFixed(1)}k` : window;
+    tags.push(`<span class="config-tag" title="${esc(title)}">上下文 ${estimated ? '≈' : ''}${size}</span>`);
+  } else tags.push('<span class="config-tag unknown">上下文未记录</span>');
+  return `<span class="member-config" aria-label="Agent 配置">${tags.join('')}</span>`;
+}
 function renderTeam() {
   if (!TEAM) return;
   const team = state.data.teams?.find(t => t.id === TEAM);
@@ -539,13 +559,36 @@ function renderTeam() {
   document.getElementById('memberCount').textContent = `${members.length}`;
   document.getElementById('leaderNote').textContent = members.some(s => s.role === 'leader')
     ? '★ Leader 保留主位；空闲不显示工作动作。' : 'Leader 未显式配置，不推断成员角色。';
-  const content = members.map(s => `<div class="team-member" data-testid="member" data-pane-id="${esc(s.paneId || s.key)}" data-key="${esc(s.key)}" data-status="${esc(s.status)}" data-agent="${esc(s.agent)}" data-role="${esc(s.role)}" data-source="${statusSource(s)}">
-    <div class="member-identity"><span class="agent ${esc(s.agent)}">${agentLogo(s.agent)}</span><span class="member-name">${esc(s.displayName || s.project || s.id)}</span>${roleBadge(s)}</div>
-    <div class="member-meta">${esc(AGENT_NAME[s.agent] || s.agent)} · ${esc(s.paneId || '未分组日志')}</div>
-    <div class="member-state" data-s="${esc(s.status)}"><span class="dot"></span><span>${esc(L[s.status] || s.status)}</span><code>${esc(s.status)}</code></div>
-    <div class="member-sources">${sourceBadge(s)}${s.presence === 'stale' ? '<span class="stale-chip">身份 stale</span>' : ''}</div>
-  </div>`).join('') || '<p class="roster-empty">房子还在，暂时没有成员。</p>';
-  if (document.getElementById('members').innerHTML !== content) document.getElementById('members').innerHTML = content;
+  // Keep rows and expanded panels alive across SSE updates, preserving keyboard
+  // focus and the reader's scroll position while status/configuration changes.
+  const roster = document.getElementById('members');
+  const prior = new Map([...roster.querySelectorAll('.team-member')].map(row => [row.dataset.key, row]));
+  roster.querySelector('.roster-empty')?.remove();
+  let previous = null;
+  for (const s of members) {
+    const row = prior.get(s.key) || document.createElement('div'); prior.delete(s.key);
+    row.className = 'team-member';
+    Object.assign(row.dataset, { testid: 'member', paneId: s.paneId || s.key, key: s.key, status: s.status, agent: s.agent, role: s.role, source: statusSource(s) });
+    const tag = memberUI ? 'BUTTON' : 'DIV';
+    let summary = row.querySelector('.member-summary');
+    if (!summary || summary.tagName !== tag) {
+      const replacement = document.createElement(tag); replacement.className = 'member-summary';
+      if (memberUI) { replacement.type = 'button'; replacement.dataset.memberToggle = ''; }
+      if (summary) summary.replaceWith(replacement); else row.prepend(replacement);
+      summary = replacement;
+    }
+    const content = `<span class="member-identity"><span class="agent ${esc(s.agent)}">${agentLogo(s.agent)}</span><span class="member-name">${esc(s.displayName || s.project || s.id)}</span>${roleBadge(s)}</span>
+      <span class="member-meta">${esc(AGENT_NAME[s.agent] || s.agent)} · ${esc(s.paneId || '未分组日志')}</span>
+      ${configurationTags(s)}
+      <span class="member-state" data-s="${esc(s.status)}"><span class="dot"></span><span>${esc(L[s.status] || s.status)}</span><code>${esc(s.status)}</code></span>
+      <span class="member-sources">${sourceBadge(s)}${s.presence === 'stale' ? '<span class="stale-chip">身份 stale</span>' : ''}</span>`;
+    if (summary.innerHTML !== content) summary.innerHTML = content;
+    if ((previous ? previous.nextElementSibling : roster.firstElementChild) !== row) roster.insertBefore(row, previous ? previous.nextElementSibling : roster.firstElementChild);
+    previous = row;
+  }
+  for (const row of prior.values()) row.remove();
+  if (!members.length) roster.innerHTML = '<p class="roster-empty">房子还在，暂时没有成员。</p>';
+  memberUI?.sync(members);
 }
 
 function card(s, now) {
@@ -1068,11 +1111,15 @@ if (TEAM && TEAM !== 'ungrouped' && !PIP && ['localhost', '127.0.0.1'].includes(
     const capability = await response.json();
     if (capability.enabled !== true || rulesPageLeft) return;
     const { mountRulesUI } = await import('/rules-ui.js');
-    if (!rulesPageLeft) mountRulesUI({
+    const rulesUI = !rulesPageLeft && mountRulesUI({
       team: TEAM,
       teamName: () => state.data.teams?.find(t => t.id === TEAM)?.name || TEAM,
       beforeOpen: () => { settingsMenu.open = false; hideTip(); },
     });
+    if (capability.members === true && !rulesPageLeft) {
+      const { mountMemberUI } = await import('/member-ui.js');
+      if (!rulesPageLeft) { memberUI = mountMemberUI({ team: TEAM, rules: rulesUI }); renderTeam(); }
+    }
   }).catch(() => { /* Fail closed: unsupported/local-disabled servers keep the entry absent. */ });
 }
 </script>

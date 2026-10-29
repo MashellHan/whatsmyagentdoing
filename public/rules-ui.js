@@ -12,6 +12,7 @@ const ERROR_TEXT = {
   503: '仓库范围或本地读取服务暂不可用，请稍后重试。',
 };
 const CODE_TEXT = {
+  member_unavailable: '此成员已经离开或会话已更换，请重新选择成员。',
   no_scope: '尚未确认该团队的仓库范围。',
   scope_not_ready: '尚未确认该团队的仓库范围。',
   scope_unavailable: '尚未确认该团队的仓库范围。',
@@ -125,20 +126,22 @@ export function mountRulesUI({ team, teamName = () => team, beforeOpen = () => {
   document.head.append(stylesheet);
   const entry = button('团队守则', 'btn rules-entry'); entry.id = 'rules-entry'; entry.setAttribute('aria-haspopup', 'dialog');
   const icon = node('span', 'rules-entry-icon', '▤'); icon.setAttribute('aria-hidden', 'true'); entry.prepend(icon);
-  document.getElementById('teamScope').after(entry);
+  document.getElementById('teamRoster').prepend(entry);
   const dialog = node('dialog', 'rules-dialog'); dialog.id = 'rules-dialog'; dialog.setAttribute('aria-labelledby', 'rules-title');
   const header = node('header', 'rules-header'), heading = node('div', 'rules-heading');
   const title = node('h2', '', '团队守则'); title.id = 'rules-title';
   const teamLabel = node('p', 'rules-team');
   heading.append(title, teamLabel);
   const close = button('关闭', 'rules-close'); close.setAttribute('aria-label', '关闭团队守则');
-  header.append(heading, node('span', 'rules-local', '只读 · 仅本机'), close);
+  const maximize = button('最大化', 'rules-maximize'); maximize.setAttribute('aria-pressed', 'false');
+  header.append(heading, node('span', 'rules-local', '只读 · 仅本机'), maximize, close);
   const shell = node('div', 'rules-shell'), sidebar = node('aside', 'rules-sidebar'); sidebar.setAttribute('aria-label', '规则文件列表');
   const listTools = node('div', 'rules-list-tools'), refresh = button('刷新列表');
   const countLabel = node('span', 'rules-count'); listTools.append(refresh, countLabel);
   const listMessage = node('p', 'rules-notice'), files = node('div', 'rules-files');
   const warning = node('p', 'rules-warning'); warning.hidden = true;
-  sidebar.append(listTools, warning, listMessage, files);
+  const scopeNote = node('p', 'rules-notice rules-scope-note'); scopeNote.hidden = true;
+  sidebar.append(listTools, scopeNote, warning, listMessage, files);
   const reader = node('section', 'rules-reader'); reader.setAttribute('aria-label', '守则阅读区');
   const toolbar = node('div', 'rules-reader-tools'), back = button('← 文件列表', 'rules-back');
   const modes = node('div', 'rules-modes'), rendered = button('阅读'), rawButton = button('原文');
@@ -148,9 +151,46 @@ export function mountRulesUI({ team, teamName = () => team, beforeOpen = () => {
   const docMeta = node('p', 'rules-meta'), article = node('article', 'rules-body');
   reader.append(toolbar, docTitle, docMeta, article); shell.append(sidebar, reader);
   const status = node('p', 'rules-status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
-  dialog.append(header, shell, status); document.body.append(dialog);
+  const resize = button('◢', 'rules-resize'); resize.setAttribute('aria-label', '调整阅读窗口大小');
+  resize.title = '拖动调整大小；方向键微调，Shift + 方向键快速调整';
+  dialog.append(header, shell, status, resize); document.body.append(dialog);
   let generation = 0, controller = null, selected = null, content = '', mode = 'reading', hasContent = false;
   let fileEntries = [], listScroll = 0;
+  let activeMember = null, returnTrigger = entry, restoreRect = null;
+  const parameters = extra => new URLSearchParams({ team, ...(activeMember ? { member: activeMember.key } : {}), ...extra });
+  function place(rect) {
+    const width = Math.max(Math.min(680, innerWidth - 32), Math.min(rect.width, innerWidth - 32));
+    const height = Math.max(Math.min(360, innerHeight - 32), Math.min(rect.height, innerHeight - 32));
+    const left = Math.max(16, Math.min(rect.x, innerWidth - width - 16));
+    const top = Math.max(16, Math.min(rect.y, innerHeight - height - 16));
+    Object.assign(dialog.style, { width: `${width}px`, height: `${height}px`, left: `${left}px`, top: `${top}px`, right: 'auto', bottom: 'auto', margin: '0' });
+  }
+  maximize.addEventListener('click', () => {
+    const expanding = dialog.dataset.maximized !== 'true';
+    if (expanding) { restoreRect = dialog.getBoundingClientRect(); dialog.removeAttribute('style'); }
+    dialog.dataset.maximized = String(expanding);
+    maximize.textContent = expanding ? '还原' : '最大化'; maximize.setAttribute('aria-pressed', String(expanding));
+    if (!expanding && restoreRect) place(restoreRect);
+  });
+  let resizing = null;
+  resize.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || innerWidth <= 760) return;
+    event.preventDefault(); resize.focus();
+    const rect = dialog.getBoundingClientRect(); place(rect);
+    resizing = { rect, x: event.clientX, y: event.clientY };
+    resize.setPointerCapture(event.pointerId);
+  });
+  resize.addEventListener('pointermove', event => {
+    if (resizing) place({ ...resizing.rect.toJSON(), width: resizing.rect.width + event.clientX - resizing.x, height: resizing.rect.height + event.clientY - resizing.y });
+  });
+  resize.addEventListener('lostpointercapture', () => { resizing = null; });
+  resize.addEventListener('pointerup', () => { resizing = null; });
+  resize.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault(); const step = event.shiftKey ? 64 : 16, rect = dialog.getBoundingClientRect();
+    place({ ...rect.toJSON(), width: rect.width + (event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0), height: rect.height + (event.key === 'ArrowDown' ? step : event.key === 'ArrowUp' ? -step : 0) });
+  });
+  window.addEventListener('resize', () => { if (dialog.open && innerWidth > 760 && dialog.dataset.maximized !== 'true' && dialog.style.width) place(dialog.getBoundingClientRect()); });
   function cancel() { generation++; controller?.abort(); controller = null; }
   function clearDocument() {
     content = ''; hasContent = false; mode = 'reading';
@@ -168,7 +208,9 @@ export function mountRulesUI({ team, teamName = () => team, beforeOpen = () => {
   function dismiss(returnFocus = true) {
     reset();
     if (dialog.open) dialog.close();
-    if (returnFocus && entry.isConnected) entry.focus({ preventScroll: true });
+    if (returnFocus && returnTrigger?.isConnected) returnTrigger.focus({ preventScroll: true });
+    activeMember = null;
+    window.dispatchEvent(new Event('rules-visibility'));
   }
   function current(version) { return version === generation && dialog.open && eligible(team); }
   function start() { cancel(); controller = new AbortController(); return { version: generation, signal: controller.signal }; }
@@ -197,7 +239,7 @@ export function mountRulesUI({ team, teamName = () => team, beforeOpen = () => {
     listMessage.textContent = '正在查找规则文件…'; article.append(node('p', 'rules-notice', '选择一个文件阅读；内容不会自动发送给 agent。'));
     sidebar.setAttribute('aria-busy', 'true'); status.textContent = '正在查找规则文件…';
     try {
-      const data = await readJSON(`/api/rules?${new URLSearchParams({ team })}`, signal);
+      const data = await readJSON(`/api/rules?${parameters()}`, signal);
       if (!current(version)) return;
       if (!Array.isArray(data.files) || data.files.length > 128 || !Number.isInteger(data.scopeCount) || data.scopeCount < 0 ||
         data.files.some(f => !f || !/^[a-f0-9]{40}$/.test(f.id) || typeof f.path !== 'string' || typeof f.scope !== 'string' || !Number.isFinite(f.size) || f.size < 0)) throw requestError(503);
@@ -215,7 +257,8 @@ export function mountRulesUI({ team, teamName = () => team, beforeOpen = () => {
         }
         const item = button('', 'rules-file');
         const mark = node('span', 'rules-file-mark', '▤'); mark.setAttribute('aria-hidden', 'true');
-        item.append(mark, node('span', 'rules-file-path', file.path), node('small', '', `${file.size} B · ${file.scope}`));
+        const association = { shared: '共享规则', configured: '成员显式配置', observed: '会话读取记录' }[file.association] || '共享规则';
+        item.append(mark, node('span', 'rules-file-path', file.path), node('small', '', `${association} · ${file.size} B`));
         item.setAttribute('aria-label', `${file.path} · ${file.scope} · ${file.size} 字节`);
         item.setAttribute('aria-current', 'false'); item.addEventListener('click', () => loadFile(file));
         groups.get(file.scope).append(item); fileEntries.push({ file, item });
@@ -237,7 +280,7 @@ export function mountRulesUI({ team, teamName = () => team, beforeOpen = () => {
     article.append(node('p', 'rules-notice', '正在读取…')); reader.setAttribute('aria-busy', 'true'); status.textContent = '正在读取…';
     docTitle.focus({ preventScroll: true });
     try {
-      const data = await readJSON(`/api/rules/file?${new URLSearchParams({ team, id: file.id })}`, signal);
+      const data = await readJSON(`/api/rules/file?${parameters({ id: file.id })}`, signal);
       if (!current(version) || selected?.id !== file.id) return;
       if (typeof data.content !== 'string' || data.path !== file.path || data.scope !== file.scope) throw requestError(409);
       if (data.content.length > MAX_CONTENT || new TextEncoder().encode(data.content).length > MAX_CONTENT) throw requestError(413);
@@ -249,10 +292,18 @@ export function mountRulesUI({ team, teamName = () => team, beforeOpen = () => {
     } catch (error) { if (current(version) && error.name !== 'AbortError') { content = ''; hasContent = false; showError(article, error, () => loadFile(file)); } }
     finally { if (current(version)) { controller = null; reader.setAttribute('aria-busy', 'false'); } }
   }
-  entry.addEventListener('click', () => {
+  function open(member = null, trigger = entry) {
     if (!eligible(team)) return;
-    beforeOpen(); reset(); teamLabel.textContent = teamName(); dialog.showModal(); close.focus(); loadList();
-  });
+    beforeOpen(); reset(); activeMember = member; returnTrigger = trigger;
+    title.textContent = member ? '成员准则 / Skills' : '团队守则';
+    close.setAttribute('aria-label', `关闭${member ? '成员准则' : '团队守则'}`);
+    teamLabel.textContent = `${teamName()}${member ? ` / ${member.name}` : ''}`;
+    scopeNote.hidden = !member;
+    scopeNote.textContent = member ? '包含共享规则、显式配置和此会话读取请求涉及的准则；不代表文件当前全部生效。' : '';
+    if (!dialog.open) dialog.showModal(); close.focus(); loadList();
+    window.dispatchEvent(new Event('rules-visibility'));
+  }
+  entry.addEventListener('click', () => open());
   close.addEventListener('click', () => dismiss());
   dialog.addEventListener('cancel', event => { event.preventDefault(); dismiss(); });
   dialog.addEventListener('close', () => { if (!dialog.open) reset(); });
@@ -277,4 +328,8 @@ export function mountRulesUI({ team, teamName = () => team, beforeOpen = () => {
   window.addEventListener('pageshow', event => { if (event.persisted) dismiss(false); });
   window.addEventListener('popstate', () => { if (!eligible(team)) { dismiss(false); entry.hidden = true; } });
   reset();
+  return {
+    openMember: (key, name, trigger) => open({ key, name }, trigger),
+    syncMembers: members => { if (activeMember && !members.some(m => m.key === activeMember.key && m.presence !== 'stale')) dismiss(false); },
+  };
 }

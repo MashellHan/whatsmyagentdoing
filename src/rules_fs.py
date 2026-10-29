@@ -11,7 +11,7 @@ import stat
 import sys
 
 LIMIT = 256 * 1024
-ROOT_NAMES = {'agents.md', 'teams.md', 'team.md', 'claude.md', 'gemini.md'}
+ROOT_NAMES = {'agents.md', 'agents.override.md', 'teams.md', 'team.md', 'claude.md', 'gemini.md'}
 FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY
 
 
@@ -29,14 +29,23 @@ def components(rel):
     parts = rel.split('/')
     if any(p in ('', '.', '..') for p in parts) or not parts[-1].lower().endswith('.md'):
         raise Denied('invalid_path')
-    if any(p.startswith('.') and not (i == 0 and p == '.codex' and len(parts) == 2 and parts[1].lower() == 'agents.md') for i, p in enumerate(parts)):
+    special = instruction_path(rel) or (rel.lower() == '.codex/agents.md')
+    if any(p.startswith('.') for p in parts) and not special:
         raise Denied('invalid_path')
     if any(p.lower() in ('node_modules', 'vendor', 'dist', 'build') for p in parts):
         raise Denied('invalid_path')
     return parts
 
 
-def open_root(root, expected=None):
+def instruction_path(rel):
+    """Exact known instructions only for non-repository ancestor/profile roots."""
+    return isinstance(rel, str) and (rel.lower() in ROOT_NAMES or bool(re.fullmatch(
+        r'(?:\.agents/)?(?:team|teams/[^/.][^/]*)/(?:playbook\.md|roles/[^/.][^/]*\.md)'
+        r'|(?:(?:\.agents|\.codex|\.claude|\.gemini|\.copilot)/)?skills/(?:\.system/)?[^/.][^/]*/SKILL\.md'
+        r'|(?:\.claude/)?agents/[^/.][^/]*\.md', rel, re.I)))
+
+
+def open_root(root, expected=None, repository=True):
     if not os.path.isabs(root) or root in ('/', os.path.expanduser('~')):
         raise Denied('invalid_root')
     fd = os.open('/', FLAGS)
@@ -50,9 +59,10 @@ def open_root(root, expected=None):
         st = os.fstat(fd)
         if expected and identity(st)[:2] != expected[:2]:
             raise Denied('scope_changed')
-        marker = os.stat('.git', dir_fd=fd, follow_symlinks=False)
-        if not (stat.S_ISREG(marker.st_mode) or stat.S_ISDIR(marker.st_mode)):
-            raise Denied('not_repository')
+        if repository:
+            marker = os.stat('.git', dir_fd=fd, follow_symlinks=False)
+            if not (stat.S_ISREG(marker.st_mode) or stat.S_ISDIR(marker.st_mode)):
+                raise Denied('not_repository')
         return fd
     except Exception:
         os.close(fd)
@@ -181,18 +191,77 @@ def list_files(request):
                 try:
                     expected = inspect(root_fd, rel)
                     output.append({'root': root, 'rootIdentity': root_identity, 'path': rel, 'identity': expected,
-                                   'scope': 'Repository ' + str(index + 1), 'size': int(expected[2])})
+                                   'scope': 'Repository ' + str(index + 1), 'size': int(expected[2]),
+                                   'association': 'configured' if rel in request.get('memberFiles', []) else 'shared'})
                 except FileNotFoundError:
                     pass
                 except (OSError, Denied):
                     warnings.append('file_unavailable')
         finally:
             os.close(root_fd)
-    return {'files': output, 'warnings': sorted(set(warnings)), 'scopeCount': min(len(roots), 8)}
+    # Ancestor/profile instructions are exact server-owned paths, not directory
+    # discovery. This admits shared workspace rules outside a Git repo without
+    # allowing arbitrary Markdown reads from a parent or a user's home.
+    scopes = set(list(roots)[:8])
+    existing = {os.path.join(f['root'], f['path']): f for f in output}
+    instruction_roots = request.get('instructionRoots', [])
+    if not isinstance(instruction_roots, list):
+        raise Denied('invalid_config')
+    if len(instruction_roots) > 16:
+        warnings.append('limit_reached')
+    for context in instruction_roots[:16]:
+        root_fd = None
+        try:
+            root = context['root']
+            root_fd = open_root(root, repository=False)
+            root_identity = identity(os.fstat(root_fd))
+            files = context.get('files', [])
+            if not isinstance(files, list):
+                raise Denied('invalid_config')
+            if len(files) > 40:
+                warnings.append('limit_reached')
+            for entry in files[:40]:
+                rel = entry.get('path')
+                if not instruction_path(rel):
+                    warnings.append('invalid_instruction_file')
+                    continue
+                try:
+                    expected = inspect(root_fd, rel)
+                    association = 'observed' if entry.get('association') == 'observed' else 'shared'
+                    absolute = os.path.join(root, rel)
+                    if absolute in existing:
+                        if existing[absolute]['association'] == 'shared':
+                            existing[absolute]['association'] = association
+                        continue
+                    if len(output) >= 128:
+                        warnings.append('limit_reached')
+                        break
+                    item = {'root': root, 'rootIdentity': root_identity, 'repository': False,
+                            'path': rel, 'identity': expected, 'size': int(expected[2]),
+                            'scope': context.get('label', '指令文件') + ' ' + str(len(scopes) + (root not in scopes)),
+                            'association': association}
+                    output.append(item)
+                    existing[absolute] = item
+                    scopes.add(root)
+                except FileNotFoundError:
+                    pass
+                except (OSError, Denied):
+                    warnings.append('file_unavailable')
+        except FileNotFoundError:
+            pass
+        except (OSError, Denied, KeyError, TypeError):
+            warnings.append('partial_scope')
+        finally:
+            if root_fd is not None:
+                os.close(root_fd)
+    return {'files': output, 'warnings': sorted(set(warnings)), 'scopeCount': len(scopes)}
 
 
 def read_file(request):
-    root_fd = open_root(request['root'], request['rootIdentity'])
+    repository = request.get('repository', True)
+    if not repository and not instruction_path(request['path']):
+        raise Denied('invalid_path')
+    root_fd = open_root(request['root'], request['rootIdentity'], repository=repository)
     fd = parent = None
     try:
         parts = components(request['path'])

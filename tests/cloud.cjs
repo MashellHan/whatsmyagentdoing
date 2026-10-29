@@ -15,7 +15,7 @@ const RAW = {
     key: 'herdr:w1-p1:019abc', id: 'w1-p1', agent: 'codex', status: 'tool', sourceStatus: 'working', statusSource: 'log', source: 'log',
     displayName: 'team-leader', teamId: 'w1', workspaceId: 'w1', paneId: 'w1-p1', tabId: 't1', role: 'leader', presence: 'fresh',
     prompt: 'PROMPT', reply: 'REPLY', title: 'TITLE', error: 'ERR', activity: 'Bash: rm -rf', cwd: '/Users/x/company', project: 'company',
-    model: 'gpt', sessionId: '019abc', logSessionId: '019abc', logKey: 'codex:019abc', parentId: 'p', subagent: false,
+    model: 'gpt', reasoningEffort: 'PRIVATE_EFFORT', contextWindow: 258400, contextWindowSource: 'recorded', recent: ['PRIVATE_COMMAND'], documents: ['/PRIVATE/SKILL.md'], sessionId: '019abc', logSessionId: '019abc', logKey: 'codex:019abc', parentId: 'p', subagent: false,
     lastEventAt: 1700000000000, startedAt: 1699999990000, turnStartedAt: 1699999999000, capabilities: { resume: true }, agentsMd: 'x',
   }],
 };
@@ -28,7 +28,7 @@ test('whitelist keeps only team/member/agent/status/time fields', async () => {
   assert.deepEqual(out.teams, [{ id: 'w1', name: 'm365', label: 'm365', presence: 'fresh' }]);
   assert.deepEqual(Object.keys(out.sessions[0]).sort(), ['agent', 'displayName', 'key', 'lastEventAt', 'presence', 'source', 'sourceStatus', 'startedAt', 'status', 'statusSource', 'subagent', 'teamId', 'turnStartedAt']);
   const text = JSON.stringify(out);
-  for (const secret of ['PROMPT', 'REPLY', 'TITLE', 'ERR', 'Bash', '/Users', 'company', 'gpt', '019abc', 'w1-p1', 'AGENTS', 'secret', '"role"', 'capabilities']) assert.ok(!text.includes(secret), secret);
+  for (const secret of ['PROMPT', 'REPLY', 'TITLE', 'ERR', 'Bash', '/Users', 'company', 'gpt', '019abc', 'w1-p1', 'AGENTS', 'secret', '"role"', 'capabilities', 'PRIVATE', 'reasoningEffort', 'contextWindow', 'documents', 'recent']) assert.ok(!text.includes(secret), secret);
   assert.equal(out.source.error, null);
 });
 
@@ -86,7 +86,7 @@ test('authenticated remote assets include new provider SVGs while local rules re
     assert.equal(await response.text(), fs.readFileSync(path.join(__dirname, '..', asset), 'utf8'));
     assert.equal((await request(asset, false)).status, 403);
   }
-  for (const asset of ['/rules-ui.js', '/api/rules', '/assets/agents/README.md']) assert.equal((await request(asset)).status, 404);
+  for (const asset of ['/rules-ui.js', '/api/rules', '/member-ui.js', '/member-ui.css', '/api/members/activity', '/assets/agents/README.md']) assert.equal((await request(asset)).status, 404);
   assert.equal(requested.length, 5, 'only authenticated, allowed assets reach the asset binding');
 });
 

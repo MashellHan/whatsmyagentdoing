@@ -109,7 +109,9 @@ async function settle(page) { await page.evaluate(()=>new Promise(resolve=>reque
     const before=await page.evaluate(()=>{window.savedOffice=office;return [office.cw,office.ch,state.view,state.agent];});
     source.emit('change');await page.locator('#viewSeg [data-v=list]').click();await page.locator('#viewSeg [data-v=office]').click();await settle(page);
     assert.equal(listCalls(),0);assert.equal(fileCalls(),0,'SSE/view changes must not prefetch');
-    await page.locator('#settingsMenu > summary').click();await open();
+    assert.equal(await page.evaluate(() => document.querySelector('#rules-entry').getBoundingClientRect().bottom <= document.querySelector('.roster-heading').getBoundingClientRect().top),true);
+    // Settings can cover the right sidebar; keyboard activation still closes it.
+    await page.locator('#settingsMenu > summary').click();await page.locator('#rules-entry').focus();await page.keyboard.press('Enter');
     await page.waitForSelector('.rules-file');
     assert.equal(await page.locator('#settingsMenu').getAttribute('open'),null);
     assert.equal(await page.evaluate(()=>office===savedOffice),true);

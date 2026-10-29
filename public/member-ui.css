@@ -1,0 +1,22 @@
+.team-member button.member-summary { position:relative; border:0; border-radius:6px; background:transparent; cursor:pointer; padding:5px; margin:-5px; width:calc(100% + 10px); }
+.team-member button.member-summary:hover { background:var(--bg); }
+.team-member button.member-summary .member-identity { padding-right:16px; }
+.team-member button.member-summary::after { content:'⌄'; position:absolute; right:5px; top:5px; color:var(--muted); transition:transform .15s; }
+.team-member button.member-summary[aria-expanded=true]::after { transform:rotate(180deg); }
+.team-member button:focus-visible, .member-commands:focus-visible { outline:2px solid var(--tool); outline-offset:3px; }
+.member-rules { min-height:32px; margin-top:7px; padding:4px 8px; border:1px solid var(--line); border-radius:5px; background:var(--panel); color:var(--muted); font-family:inherit; font-size:11px; line-height:1.4; cursor:pointer; }
+.member-rules:hover { color:var(--ink); border-color:var(--muted); }
+.member-activity { margin-top:9px; border:1px solid var(--line); border-radius:8px; background:var(--bg); overflow:hidden; }
+.member-activity-heading { display:flex; gap:6px; justify-content:space-between; align-items:center; padding:9px 10px; border-bottom:1px solid var(--line); font-size:11px; }
+.member-activity-heading strong { font-weight:600; }
+.member-activity-status { color:var(--muted); font-size:10px; }
+.member-commands { list-style:none; padding:0 9px; margin:0; max-height:270px; overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
+.member-command { padding:9px 0; border-bottom:1px solid var(--line); }
+.member-command:last-child { border-bottom:0; }
+.member-command-heading { display:flex; flex-wrap:wrap; justify-content:space-between; gap:3px 7px; color:var(--muted); font:9px/1.5 ui-monospace,monospace; overflow-wrap:anywhere; }
+.member-command-heading time { white-space:nowrap; }
+.member-command pre { max-height:8em; overflow:auto; margin:5px 0 0; color:var(--ink); font:11px/1.6 ui-monospace,monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
+.member-truncated { display:block; color:var(--muted); font-size:9px; margin-top:4px; }
+.member-activity-note { margin:12px 0; color:var(--muted); font-size:11px; line-height:1.7; overflow-wrap:anywhere; }
+.member-activity-foot { margin:0; padding:7px 9px; border-top:1px solid var(--line); color:var(--muted); font-size:9px; line-height:1.5; }
+@media (prefers-reduced-motion:reduce) { .team-member button.member-summary::after { transition:none; } }

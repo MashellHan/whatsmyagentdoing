@@ -24,6 +24,7 @@ function newSession(agent, id, file) {
     cwd: null,
     title: null,
     model: null,
+    reasoningEffort: null,
     subagent: false,
     parentId: null,
     status: 'idle',
@@ -52,10 +53,13 @@ function today(s, ts) {
   return s.daily.day === day ? s.daily : null;
 }
 
-function usage(s, ts, { context, window, tokens }) {
+function usage(s, ts, { context, window, tokens, windowSource = 'recorded' }) {
   if (Number.isFinite(context) && context > 0) {
     s.context = context;
-    s.contextWindow = Number.isFinite(window) && window > 0 ? window : null;
+  }
+  if (Number.isFinite(window) && window > 0) {
+    s.contextWindow = window;
+    s.contextWindowSource = windowSource;
   }
   const d = Number.isFinite(tokens) && tokens > 0 && today(s, ts);
   if (d) d.tokens += tokens;
@@ -197,7 +201,7 @@ function applyClaude(s, d) {
         s._usageId = m.id;
         const n = (k) => (Number.isFinite(u[k]) ? u[k] : 0);
         const prompt = n('input_tokens') + n('cache_creation_input_tokens') + n('cache_read_input_tokens');
-        usage(s, ts, { context: prompt + n('output_tokens'), window: prompt + n('output_tokens') > 200_000 ? 1_000_000 : 200_000,
+        usage(s, ts, { context: prompt + n('output_tokens'), window: prompt + n('output_tokens') > 200_000 ? 1_000_000 : 200_000, windowSource: 'estimated',
           tokens: n('input_tokens') + n('cache_creation_input_tokens') + n('output_tokens') });
       }
       const blocks = Array.isArray(m.content) ? m.content : [];
@@ -260,12 +264,21 @@ function applyCodex(s, d) {
       if (p.thread_source && p.thread_source !== 'user') s.subagent = true;
       return;
     case 'turn_context':
+      if (s.model && p.model && s.model !== p.model) {
+        s.context = s.contextWindow = s.contextWindowSource = null;
+      }
       if (p.model) s.model = p.model;
+      // Per-turn values are authoritative; never infer effort from a model name
+      // or from whether the transcript contains reasoning blocks.
+      s.reasoningEffort = typeof (p.effort ?? p.reasoning_effort ?? p.collaboration_mode?.settings?.reasoning_effort) === 'string'
+        ? clean(p.effort ?? p.reasoning_effort ?? p.collaboration_mode?.settings?.reasoning_effort, 40) : null;
+      usage(s, ts, { window: p.model_context_window });
       if (p.cwd) s.cwd = p.cwd;
       return;
     case 'event_msg':
       switch (p.type) {
         case 'task_started':
+          usage(s, ts, { window: p.model_context_window });
           // Old and new log formats both start every turn with this event.
           countTurn(s, ts);
           s.turnStartedAt = ts;
@@ -288,6 +301,7 @@ function applyCodex(s, d) {
           set(s, 'thinking', null);
           return;
         case 'token_count': {
+          usage(s, ts, { window: p.info?.model_context_window });
           const last = p.info?.last_token_usage;
           if (!last || typeof last !== 'object') return;
           const n = (k) => (Number.isFinite(last[k]) ? last[k] : 0);
@@ -587,6 +601,10 @@ function applyOMP(s, d) {
   }
   if (d.type === 'model_change') {
     if ((!d.role || d.role === 'default') && d.model) s.model = d.model;
+    return;
+  }
+  if (d.type === 'thinking_level_change') {
+    s.reasoningEffort = clean(d.thinkingLevel, 40);
     return;
   }
   if (d.type === 'custom') {

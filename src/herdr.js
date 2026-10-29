@@ -33,6 +33,7 @@ class HerdrWatcher extends EventEmitter {
     this.members = [];
     this.houses = [];
     this.ruleDirectories = new Map(); // private only: never part of teams()/sessions()
+    this.memberRuleContexts = new Map();
     this.health = { kind: 'herdr', ...this.context, presence: 'connecting', error: null };
     this.pending = null;
     this.stopped = false;
@@ -40,8 +41,12 @@ class HerdrWatcher extends EventEmitter {
   sessions() { return this.members; }
   teams() { return this.houses; }
   sourceInfo() { return this.health; }
-  ruleContext(teamId) {
+  ruleContext(teamId, memberKey = null) {
     if (this.health.presence !== 'fresh' || !this.houses.some(team => team.id === teamId)) return null;
+    if (memberKey) {
+      const member = this.members.find(s => s.teamId === teamId && s.key === memberKey);
+      return member ? this.memberRuleContexts.get(memberKey) || null : null;
+    }
     const rules = this.teamMap.workspaces?.[teamId]?.rules || {};
     return { directories: this.ruleDirectories.get(teamId) || [], extraFiles: rules.extraFiles || [], roots: rules.roots || [] };
   }
@@ -91,6 +96,7 @@ class HerdrWatcher extends EventEmitter {
       this.ruleDirectories = directories;
       const now = this.now();
       const previous = new Map(this.members.map(s => [s.key, s]));
+      const memberContexts = new Map();
       const houses = new Map(workspaces.map(w => [w.workspace_id, {
         id: w.workspace_id, workspaceId: w.workspace_id,
         name: text(w.label) || w.workspace_id, label: text(w.label) || w.workspace_id,
@@ -106,6 +112,16 @@ class HerdrWatcher extends EventEmitter {
         const config = this.teamMap.workspaces?.[a.workspace_id];
         const leader = config?.leaderPane === a.pane_id && (!config.expectedName || config.expectedName === displayName);
         const memberConfig = this.teamMap.members?.[a.pane_id];
+        const personal = memberConfig?.expectedName === displayName &&
+          (!memberConfig.expectedSessionId || memberConfig.expectedSessionId === occupant) ? memberConfig.rules || {} : {};
+        const shared = config?.rules || {};
+        memberContexts.set(key, {
+          memberKey: key,
+          directories: [text(a.foreground_cwd) || text(a.cwd) || text(workspaces.find(w => w.workspace_id === a.workspace_id)?.cwd)].filter(Boolean),
+          roots: [...(shared.roots || []), ...(personal.roots || [])],
+          extraFiles: [...(shared.extraFiles || []), ...(personal.extraFiles || [])],
+          memberFiles: personal.extraFiles || [],
+        });
         const memberRole = memberConfig?.expectedName === displayName && ['dev', 'designer'].includes(memberConfig.role) ? memberConfig.role : 'member';
         if (!houses.has(a.workspace_id)) houses.set(a.workspace_id, {
           id: a.workspace_id, workspaceId: a.workspace_id, name: a.workspace_id,
@@ -127,6 +143,7 @@ class HerdrWatcher extends EventEmitter {
           // No terminal titles, cwd, prompts, replies or session contents are ingested.
         };
       }).sort((a, b) => a.paneId.localeCompare(b.paneId, undefined, { numeric: true }));
+      this.memberRuleContexts = memberContexts;
       this.houses = [...houses.values()].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
       this.health = { kind: 'herdr', ...this.context, presence: 'fresh', error: null };
     } catch {

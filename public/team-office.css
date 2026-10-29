@@ -21,6 +21,11 @@ body:not(.pip) .controls { padding-top:10px; }
 #leaderNote, .roster-empty { color:var(--muted); font-size:10px; line-height:1.6; }
 .team-member { padding:7px 0; border-bottom:1px solid var(--line); }
 .team-member:last-child { border:0; }
+.member-summary { display:block; width:100%; padding:0; color:inherit; font:inherit; text-align:left; }
+.member-summary .member-meta { display:block; }
+.member-config { display:flex; flex-wrap:wrap; gap:4px; margin:7px 0; }
+.config-tag { display:inline-block; max-width:100%; padding:3px 6px; border:1px solid var(--line); border-radius:5px; background:var(--bg); color:var(--ink); font:10px/1.4 ui-monospace,monospace; overflow-wrap:anywhere; }
+.config-tag.unknown { color:var(--muted); font-family:inherit; }
 .member-identity { display:flex; flex-wrap:wrap; gap:7px; align-items:center; }
 .member-name { font-size:12px; font-weight:600; min-width:0; overflow-wrap:anywhere; }
 .role-label { color:#9b7327; font-size:9px; flex-shrink:0; }

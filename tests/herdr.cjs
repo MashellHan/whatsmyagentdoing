@@ -138,3 +138,21 @@ test('rule directory candidates remain private and stop being available when ide
   assert.equal(JSON.stringify(snapshot(f.w)).includes('ruleDirectories'), false);
   f.fail(true); await f.w.tick(); assert.equal(f.w.ruleContext('w1'), null);
 });
+
+test('member rule contexts use only that occupant cwd and guarded explicit configuration', async () => {
+  const f = fixture();
+  f.data.agents[1].foreground_cwd = '/member/one';
+  f.data.agents[2].cwd = '/member/two';
+  f.w.teamMap.members = { 'w1:p1': { expectedName: 'member-1', expectedSessionId: 'session-1', rules: { extraFiles: ['.agents/team/roles/leader.md'] } } };
+  await f.w.tick();
+  const one = f.w.sessions()[1].key, two = f.w.sessions()[2].key;
+  assert.deepEqual(f.w.ruleContext('w1', one).directories, ['/member/one']);
+  assert.deepEqual(f.w.ruleContext('w1', two).directories, ['/member/two']);
+  assert.deepEqual(f.w.ruleContext('w1', one).memberFiles, ['.agents/team/roles/leader.md']);
+  assert.equal(f.w.ruleContext('w2', one), null);
+  assert.doesNotMatch(JSON.stringify(snapshot(f.w)), /\/member\/|leader.md|memberRuleContexts/);
+  f.data.agents[1].agent_session.value = 'replacement'; await f.w.tick();
+  assert.equal(f.w.ruleContext('w1', one), null);
+  assert.deepEqual(f.w.ruleContext('w1', f.w.sessions()[1].key).memberFiles, []);
+  f.fail(true); await f.w.tick(); assert.equal(f.w.ruleContext('w1', two), null);
+});

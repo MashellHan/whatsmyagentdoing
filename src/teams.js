@@ -3,6 +3,8 @@
 const { EventEmitter } = require('node:events');
 const { HerdrWatcher } = require('./herdr');
 const { Watcher } = require('./watcher');
+const { RulesError } = require('./rules');
+const { instructionScopes } = require('./rule-context');
 
 // Herdr owns identity and topology. The unchanged Watcher/parsers own activity.
 // Never infer a binding from cwd, name, terminal title, or fuzzy ID matching.
@@ -76,7 +78,31 @@ class TeamWatcher extends EventEmitter {
     return teams;
   }
   sourceInfo() { return { ...this.herdr.sourceInfo(), kind: 'logs+herdr', statusPolicy: 'log-first-exact-session', logInterval: 1000 }; }
-  ruleContext(teamId) { return this.herdr.ruleContext(teamId); }
+  member(teamId, memberKey) {
+    if (this.herdr.sourceInfo().presence !== 'fresh') throw new RulesError('scope_stale', 503);
+    const member = this.sessions().find(s => s.teamId === teamId && s.key === memberKey && s.paneId);
+    if (!member || teamId === 'ungrouped') throw new RulesError('member_unavailable', 404);
+    return member;
+  }
+  memberActivity(teamId, memberKey) {
+    const member = this.member(teamId, memberKey);
+    if (member.binding !== 'exact-session' || member.statusSource !== 'log') {
+      return { member: memberKey, available: false, reason: member.binding === 'exact-session' ? 'log-unavailable' : member.binding, entries: [], limit: 30, textLimit: 360 };
+    }
+    const detail = this.logs.localDetails?.(member.logKey);
+    if (!detail) return { member: memberKey, available: false, reason: 'log-unavailable', entries: [], limit: 30, textLimit: 360 };
+    const { documents, ...activity } = detail;
+    return { member: memberKey, available: true, ...activity };
+  }
+  ruleContext(teamId, memberKey = null) {
+    const context = this.herdr.ruleContext(teamId, memberKey);
+    if (!context) return null;
+    if (!memberKey) return { ...context, instructionRoots: instructionScopes(context) };
+    const member = this.member(teamId, memberKey);
+    const documents = member.binding === 'exact-session' && member.statusSource === 'log'
+      ? this.logs.localDetails?.(member.logKey)?.documents || [] : [];
+    return { ...context, instructionRoots: instructionScopes(context, member.agent, documents) };
+  }
 }
 
 module.exports = { TeamWatcher, joinSessions };

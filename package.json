@@ -39,11 +39,12 @@
     "three": "^0.186.1"
   },
   "scripts": {
-    "test": "node --test tests/watcher.cjs tests/herdr.cjs tests/cli-session.cjs tests/teams.cjs tests/office-team.cjs tests/homepage.cjs tests/local-safety.cjs tests/cloud.cjs tests/rules.cjs tests/omp.cjs tests/magpie.cjs tests/copilot.cjs tests/hook.cjs tests/usage.cjs tests/server.cjs tests/clients.cjs",
+    "test": "node --test tests/watcher.cjs tests/herdr.cjs tests/cli-session.cjs tests/teams.cjs tests/office-team.cjs tests/homepage.cjs tests/local-safety.cjs tests/cloud.cjs tests/rules.cjs tests/omp.cjs tests/magpie.cjs tests/copilot.cjs tests/hook.cjs tests/usage.cjs tests/server.cjs tests/clients.cjs tests/activity.cjs",
     "test:town": "node tests/homepage-ui.cjs && node tests/town.cjs",
     "test:wide": "node tests/wide-ui.cjs",
     "test:compact": "node tests/compact-ui.cjs",
     "test:rules-ui": "node tests/rules-ui.cjs && node tests/rules-integration.cjs",
+    "test:members-ui": "node tests/members-ui.cjs",
     "capture:homepage": "node scripts/capture-homepage.cjs",
     "build": "esbuild web/office3d.js --bundle --format=esm --minify --target=es2020 --outfile=public/office3d.js --legal-comments=eof",
     "start": "node bin/cli.js",

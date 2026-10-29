@@ -14,6 +14,8 @@ const STATIC = {
   '/team-office.css': ['team-office.css', 'text/css; charset=utf-8'],
   '/rules-ui.js': ['rules-ui.js', 'text/javascript; charset=utf-8'],
   '/rules-ui.css': ['rules-ui.css', 'text/css; charset=utf-8'],
+  '/member-ui.js': ['member-ui.js', 'text/javascript; charset=utf-8'],
+  '/member-ui.css': ['member-ui.css', 'text/css; charset=utf-8'],
   '/office': ['index.html', 'text/html; charset=utf-8'],
   '/office/': ['index.html', 'text/html; charset=utf-8'],
   '/office.js': ['office.js', 'text/javascript; charset=utf-8'],
@@ -89,6 +91,9 @@ function view(s, now, { privacy = true }) {
     project: s.cwd ? `${s.agent === 'copilot' ? 'workspace-' : ''}${path.basename(s.cwd)}` : null,
     title: s.title,
     model: s.model,
+    reasoningEffort: s.reasoningEffort || null,
+    contextWindow: s.contextWindow || null,
+    contextWindowSource: s.contextWindowSource || null,
     status,
     stuck,
     context: s.context ? { used: s.context, window: s.contextWindow || null } : null,
@@ -151,7 +156,7 @@ function snapshot(watcher, opts = {}) {
 }
 
 function createServer(watcher, opts = {}, { onShutdown, rulesReader } = {}) {
-  const rules = rulesReader || (typeof watcher.ruleContext === 'function' ? new RulesReader(team => watcher.ruleContext(team)) : null);
+  const rules = rulesReader || (typeof watcher.ruleContext === 'function' ? new RulesReader((team, member) => watcher.ruleContext(team, member)) : null);
   const clients = new Set();
   let last = '';
 
@@ -182,7 +187,7 @@ function createServer(watcher, opts = {}, { onShutdown, rulesReader } = {}) {
     let url;
     try { url = new URL(req.url, 'http://localhost'); decodeURIComponent(url.pathname); }
     catch { res.writeHead(400).end(); return; }
-    if (url.pathname === '/api/rules' || url.pathname.startsWith('/api/rules/')) {
+    if (url.pathname === '/api/rules' || url.pathname.startsWith('/api/rules/') || url.pathname.startsWith('/api/members/')) {
       // Local rule files have a stricter boundary than ordinary status data.
       // The custom header is a cross-origin preflight guard, not authentication.
       const origin = `http://${req.headers.host}`;
@@ -194,19 +199,21 @@ function createServer(watcher, opts = {}, { onShutdown, rulesReader } = {}) {
       };
       if (!local || req.method !== 'GET' || req.headers['x-agent-office-rule-read'] !== '1' ||
           (req.headers.origin && req.headers.origin !== origin) || (fetchSite && fetchSite !== 'same-origin') ||
-          req.headers['x-forwarded-for'] || req.headers['x-forwarded-host'] || req.headers.range) {
+          req.headers['x-forwarded-for'] || req.headers['x-forwarded-host'] || req.headers['x-forwarded-proto'] || req.headers.forwarded || req.headers.range) {
         writeJSON(403, { error: 'local_same_origin_only' }); return;
       }
       if (url.pathname === '/api/rules/capabilities') {
-        writeJSON(200, { enabled: !!rules }); return;
+        writeJSON(200, { enabled: !!rules, members: typeof watcher.memberActivity === 'function' }); return;
       }
-      const team = url.searchParams.get('team'), id = url.searchParams.get('id');
-      const allowed = url.pathname === '/api/rules' ? ['team'] : url.pathname === '/api/rules/file' ? ['team', 'id'] : [];
-      if (!rules || !team || team.length > 100 || !allowed.length || [...url.searchParams.keys()].some(k => !allowed.includes(k)) ||
+      const team = url.searchParams.get('team'), id = url.searchParams.get('id'), member = url.searchParams.get('member');
+      const activity = url.pathname === '/api/members/activity';
+      const allowed = url.pathname === '/api/rules' ? ['team', 'member'] : url.pathname === '/api/rules/file' ? ['team', 'id', 'member'] : activity ? ['team', 'member'] : [];
+      if ((!activity && !rules) || (activity && (typeof watcher.memberActivity !== 'function' || !member)) ||
+          !team || team.length > 100 || (url.searchParams.has('member') && (!member || member.length > 300)) || !allowed.length || [...url.searchParams.keys()].some(k => !allowed.includes(k)) ||
           [...new Set(url.searchParams.keys())].some(k => url.searchParams.getAll(k).length !== 1)) {
         writeJSON(404, { error: 'not_found' }); return;
       }
-      Promise.resolve().then(() => url.pathname === '/api/rules' ? rules.list(team) : rules.read(team, id)).then(
+      Promise.resolve().then(() => activity ? watcher.memberActivity(team, member) : url.pathname === '/api/rules' ? rules.list(team, member) : rules.read(team, id, member)).then(
         body => writeJSON(200, body), error => writeJSON(error.status || 503, { error: error.code || 'reader_unavailable' }),
       );
       return;

@@ -57,6 +57,16 @@ not edit Claude settings. Self-updates and scene mutations remain disabled.
 
 Optional `members` mappings may assign `dev` or `designer` roles, keyed by pane ID and guarded by an exact `expectedName`. A renamed/replaced occupant safely falls back to member. These badges appear in the room roster and list; they do not change activity or elect a leader. Keep real mappings local.
 
+## Local member details
+
+The roster shows model, reasoning effort and context-window tags from the member's actual session log. Codex per-turn settings and OMP thinking-level changes are tracked; unsupported or missing values are marked unrecorded. The existing Claude context-window estimate is explicitly labeled with ≈. Context tags have the recorded capacity and, when available, used tokens in their tooltip. These tags do not read the current global CLI defaults, which may differ from a running session.
+
+Click a member to expand a small **最近命令** panel. The watcher keeps at most 30 tool requests per tracked log; each displayed request is capped at 360 Unicode characters. It includes shell commands and other tools, not tool output, user prompts or reasoning text. Large logs retain only the history found in the existing bounded replay. A panel polls every 1.5 seconds while visible; closing it, switching members, hiding the page or opening the rules dialog cancels requests. Only one member panel is open at a time, and status updates preserve its scroll position.
+
+`GET /api/members/activity?team=…&member=…` requires the same loopback, GET, same-origin header and no-forwarding checks as the rules reader. It validates a fresh current member plus an unambiguous provider/session binding before accessing that log's private history. Missing session IDs, ambiguous matches and remote-only observations report unavailable rather than guessing. The new history and document references never enter status snapshots or Cloudflare uploads. Model/effort/context remain excluded by the existing cloud whitelist, and private member/reader modules are excluded from the remote asset build.
+
+**团队守则** is above the member heading; each member has an independent **准则 / Skills** entry. See [the rules reader](TEAM-RULES.md) for association labels, scope and resizing. `npm run test:members-ui` exercises live updates, cancellation, per-member isolation, viewport fit and reader resizing with synthetic data.
+
 ## Checks
 
 `npm test` uses isolated synthetic records and temporary files. `npm run test:town` and `npm run test:ui` use local fixture servers and an installed Playwright/Chromium. Set `WMAD_BROWSER_EXECUTABLE` to an existing browser executable if Chrome is not in its default location. Do not download dependencies merely to run the dashboard.
