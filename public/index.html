@@ -530,15 +530,15 @@ function configurationTags(s) {
   if (s.model) tags.push(`<span class="config-tag" title="会话记录的模型：${esc(s.model)}">${esc(s.model)}</span>`);
   else tags.push('<span class="config-tag unknown">模型未记录</span>');
   tags.push(s.reasoningEffort
-    ? `<span class="config-tag" title="会话记录的推理强度">推理 ${esc(s.reasoningEffort)}</span>`
-    : '<span class="config-tag unknown">推理未记录</span>');
+    ? `<span class="config-tag" title="会话记录的推理强度">${esc(s.reasoningEffort)}</span>`
+    : '<span class="config-tag unknown" title="推理强度未记录">未记录</span>');
   if (window) {
     const estimated = s.contextWindowSource === 'estimated';
     const used = s.context?.used;
     const title = `${estimated ? '估计的上下文窗口' : '会话记录的上下文窗口'}：${window.toLocaleString()} tokens${used ? `；已用 ${used.toLocaleString()} (${Math.round(100 * used / window)}%)` : ''}`;
     const size = window >= 1e6 ? `${+(window / 1e6).toFixed(2)}M` : window >= 1000 ? `${+(window / 1000).toFixed(1)}k` : window;
-    tags.push(`<span class="config-tag" title="${esc(title)}">上下文 ${estimated ? '≈' : ''}${size}</span>`);
-  } else tags.push('<span class="config-tag unknown">上下文未记录</span>');
+    tags.push(`<span class="config-tag" title="${esc(title)}">${estimated ? '≈' : ''}${size}</span>`);
+  } else tags.push('<span class="config-tag unknown" title="上下文窗口未记录">未记录</span>');
   return `<span class="member-config" aria-label="Agent 配置">${tags.join('')}</span>`;
 }
 function renderTeam() {

@@ -3,8 +3,8 @@
 const HEADERS = { 'x-agent-office-rule-read': '1' };
 const INTERVAL = 1500;
 const REASONS = {
-  'no-session-id': '此成员尚未提供会话 ID，无法关联最近命令。',
-  'ambiguous-session': '发现多个同 ID 的日志，暂时无法确认该成员的命令。',
+  'no-session-id': '此成员尚未提供会话 ID，暂时无法读取最近活动。',
+  'ambiguous-session': '发现多个同 ID 的日志，暂时无法确认该成员的活动记录。',
   'log-unavailable': '尚未找到此成员的本机会话日志。',
 };
 function node(tag, className, text) {
@@ -38,10 +38,10 @@ export function mountMemberUI({ team, rules }) {
     const atBottom = active.list.scrollHeight - scroll - active.list.clientHeight < 24;
     active.list.replaceChildren();
     if (!data.available) {
-      active.list.append(node('li', 'member-activity-note', REASONS[data.reason] || '此成员的最近命令暂不可用。'));
+      active.list.append(node('li', 'member-activity-note', REASONS[data.reason] || '此成员的最近活动暂不可用。'));
       active.status.textContent = '尚未关联'; return;
     }
-    if (!data.entries.length) active.list.append(node('li', 'member-activity-note', '当前日志范围内还没有工具或命令记录。'));
+    if (!data.entries.length) active.list.append(node('li', 'member-activity-note', '暂无活动记录。'));
     for (const entry of data.entries) {
       const row = node('li', 'member-command');
       const heading = node('div', 'member-command-heading');
@@ -77,7 +77,7 @@ export function mountMemberUI({ team, rules }) {
     } catch (error) {
       if (version !== generation || active?.key !== key || !canPoll()) return;
       active.signature = null;
-      active.list.replaceChildren(node('li', 'member-activity-note', error.name === 'AbortError' ? '读取超时，正在重试…' : '最近命令暂不可用，正在重试…'));
+      active.list.replaceChildren(node('li', 'member-activity-note', error.name === 'AbortError' ? '读取超时，正在重试…' : '最近活动暂不可用，正在重试…'));
       active.status.textContent = '重连中';
     } finally {
       clearTimeout(deadline);
@@ -87,11 +87,11 @@ export function mountMemberUI({ team, rules }) {
   function open(member, row) {
     close();
     const panel = node('section', 'member-activity'); panel.id = `member-activity-${++sequence}`;
-    panel.setAttribute('aria-label', `${member.displayName || member.id} 的最近命令`);
+    panel.setAttribute('aria-label', `${member.displayName || member.id} 的最近活动`);
     const heading = node('div', 'member-activity-heading'), status = node('span', 'member-activity-status', '连接中');
     status.setAttribute('role', 'status');
-    heading.append(node('strong', '', '最近命令'), status);
-    const list = node('ol', 'member-commands'); list.tabIndex = 0; list.setAttribute('aria-label', '最近工具和命令');
+    heading.append(node('strong', '', '最近活动'), status);
+    const list = node('ol', 'member-commands'); list.tabIndex = 0; list.setAttribute('aria-label', '最近活动记录');
     list.append(node('li', 'member-activity-note', '正在读取…'));
     panel.append(heading, list, node('p', 'member-activity-foot', '每 1.5 秒刷新 · 最多 30 条 · 每条最多 360 字'));
     row.append(panel);
@@ -126,7 +126,7 @@ export function mountMemberUI({ team, rules }) {
       for (const row of roster.querySelectorAll('.team-member')) {
         const toggle = row.querySelector('.member-summary');
         toggle.setAttribute('aria-expanded', String(active?.key === row.dataset.key));
-        toggle.title = '点击展开或收起最近命令';
+        toggle.title = '点击展开或收起最近活动';
         if (rules && !row.querySelector('.member-rules')) {
           const entry = node('button', 'member-rules', '▤ 准则 / Skills'); entry.type = 'button';
           entry.setAttribute('aria-haspopup', 'dialog');
