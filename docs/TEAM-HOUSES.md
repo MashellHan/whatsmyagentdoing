@@ -37,6 +37,7 @@ Open `http://127.0.0.1:4546`. No runtime dependency installation is needed. Only
 - The original session watcher/parsers supply activity. Binding requires exact provider + session ID; directories and names are never used for fuzzy matching.
 - Joined log states retain the original typing/thinking/tool/waiting/error timeout rules. The UI shows a per-member log source label.
 - Only an unavailable/ambiguous log binding falls back to clearly marked Herdr status. Unregistered logs appear in a separate house and are not duplicated.
+- Upstream v0.4.0 adds Copilot CLI, OMP, Kimi Code, DSH and Grok Build logs. Kimi child resume IDs do not identify their parent as the child. Explicitly configured local Magpie observations keep a separate source label and cannot offer a native resume command.
 - Prompt/reply/title/error content is removed from private snapshots. Infrastructure names, session IDs and original path metadata are not anonymized; do not publish live snapshots.
 - Herdr read failures retain the last identity snapshot as stale. They do not fabricate agent completion. Team room filters apply before notifications and rendering, including PiP.
 
@@ -47,6 +48,12 @@ Configure known leaders explicitly in `config/team-houses.json` (or `--team-map 
 ```
 
 No role is inferred from pane order, project directory, or a name containing “leader”. The leader keeps a neutral main seat when idle; other members keep original work/wander/off-duty behavior.
+
+The local Today panel totals only the selected house when a team room is open.
+The remote viewer does not receive usage, context, project totals or resume
+commands, and hides Today when those totals are unavailable. The optional Claude
+approval hook requires an explicit `--install-hook` command; normal startup does
+not edit Claude settings. Self-updates and scene mutations remain disabled.
 
 Optional `members` mappings may assign `dev` or `designer` roles, keyed by pane ID and guarded by an exact `expectedName`. A renamed/replaced occupant safely falls back to member. These badges appear in the room roster and list; they do not change activity or elect a leader. Keep real mappings local.
 

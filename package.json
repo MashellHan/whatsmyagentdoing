@@ -1,7 +1,7 @@
 {
   "name": "whatsmyagentdoing",
-  "version": "0.3.1",
-  "description": "See what every Claude Code and Codex agent on your machine is doing, live in your browser.",
+  "version": "0.4.0",
+  "description": "Live office for Claude Code, Codex, Gemini CLI and OMP sessions.",
   "bin": {
     "whatsmyagentdoing": "bin/cli.js"
   },
@@ -39,7 +39,7 @@
     "three": "^0.186.1"
   },
   "scripts": {
-    "test": "node --test tests/watcher.cjs tests/herdr.cjs tests/cli-session.cjs tests/teams.cjs tests/office-team.cjs tests/homepage.cjs tests/local-safety.cjs tests/cloud.cjs tests/rules.cjs",
+    "test": "node --test tests/watcher.cjs tests/herdr.cjs tests/cli-session.cjs tests/teams.cjs tests/office-team.cjs tests/homepage.cjs tests/local-safety.cjs tests/cloud.cjs tests/rules.cjs tests/omp.cjs tests/magpie.cjs tests/copilot.cjs tests/hook.cjs tests/usage.cjs tests/server.cjs tests/clients.cjs",
     "test:town": "node tests/homepage-ui.cjs && node tests/town.cjs",
     "test:wide": "node tests/wide-ui.cjs",
     "test:compact": "node tests/compact-ui.cjs",
@@ -48,7 +48,13 @@
     "build": "esbuild web/office3d.js --bundle --format=esm --minify --target=es2020 --outfile=public/office3d.js --legal-comments=eof",
     "start": "node bin/cli.js",
     "test:ui": "node tests/ui.cjs",
-    "test:watcher": "node --test tests/watcher.cjs",
+    "test:watcher": "node --test tests/watcher.cjs tests/omp.cjs",
+    "test:magpie": "node --test tests/magpie.cjs",
+    "test:copilot": "node --test tests/copilot.cjs",
+    "test:hook": "node --test tests/hook.cjs tests/usage.cjs",
+    "test:server": "node --test tests/server.cjs",
+    "test:clients": "node --test tests/clients.cjs",
+    "test:ui:clients": "node tests/ui-clients.cjs",
     "cf:build": "node cloudflare/build.mjs"
   }
 }

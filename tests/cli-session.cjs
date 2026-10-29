@@ -12,6 +12,8 @@ test('the CLI reads an explicitly selected team outside Herdr without inventing 
   const bin = path.join(fixture, 'bin');
   fs.mkdirSync(bin);
   const callsFile = path.join(fixture, 'calls.jsonl');
+  const preload = path.join(fixture, 'isolate.cjs');
+  fs.writeFileSync(preload, "require('node:os').homedir = () => process.env.WMAD_TEST_HOME;\n");
   fs.writeFileSync(path.join(bin, 'herdr'), [
     '#!/usr/bin/env node',
     "const fs = require('node:fs');",
@@ -28,10 +30,16 @@ test('the CLI reads an explicitly selected team outside Herdr without inventing 
     CLAUDE_CONFIG_DIR: path.join(fixture, 'claude'),
     CODEX_HOME: path.join(fixture, 'codex'),
     GEMINI_CLI_HOME: path.join(fixture, 'gemini'),
+    KIMI_CODE_HOME: path.join(fixture, 'kimi'),
+    DSH_HOME: path.join(fixture, 'dsh'),
+    GROK_HOME: path.join(fixture, 'grok'),
+    WMAD_OMP_SESSIONS_DIR: path.join(fixture, 'omp'),
+    WMAD_MAGPIE_SOURCES: '[]',
+    WMAD_TEST_HOME: fixture,
     WMAD_TEST_CALLS: callsFile,
   };
   for (const key of Object.keys(env)) if (key.startsWith('HERDR_')) delete env[key];
-  const run = args => execute(process.execPath, ['bin/cli.js', ...args], {
+  const run = args => execute(process.execPath, ['--require', preload, 'bin/cli.js', ...args], {
     cwd: path.join(__dirname, '..'), env, timeout: 10000,
   });
 

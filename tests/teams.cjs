@@ -35,11 +35,33 @@ test('all original timeout boundaries apply to joined log states regardless of H
   for (const status of ['idle', 'done', 'interrupted']) assert.equal(view(joinSessions([member()], [log({ status })])[0], NOW, {}).status, status);
 });
 
-test('Claude/Codex/Gemini identity is preserved and Gemini sessionId aliases bind exactly', () => {
-  for (const agent of ['claude', 'codex', 'gemini']) {
+test('native provider identity is preserved and Gemini sessionId aliases bind exactly', () => {
+  for (const agent of ['claude', 'codex', 'gemini', 'copilot', 'omp', 'kimi', 'dsh', 'grok']) {
     const raw = log({ agent, id: agent === 'gemini' ? 'session-file-name' : 'abc', sessionId: agent === 'gemini' ? 'abc' : null });
     const result = joinSessions([member({ agent, logAgent: agent })], [raw]);
     assert.equal(result.length, 1); assert.equal(result[0].agent, agent); assert.equal(result[0].statusSource, 'log');
+  }
+});
+
+test('a Kimi child resume ID cannot make its parent team binding ambiguous', () => {
+  const parent = log({ agent: 'kimi' });
+  const child = log({ agent: 'kimi', id: 'child', sessionId: 'abc', parentId: 'abc', subagent: true });
+  const rows = joinSessions([member({ agent: 'kimi', logAgent: 'kimi' })], [parent, child]);
+  assert.equal(rows[0].binding, 'exact-session');
+  assert.equal(rows[0].id, 'abc');
+  assert.equal(rows[1].id, 'child');
+  assert.equal(rows[1].teamId, 'ungrouped');
+});
+
+test('joined and ungrouped Magpie observations retain provenance and never offer native resume', () => {
+  for (const registered of [true, false]) {
+    const raw = log({ source: 'magpie', status: 'thinking', lastEventAt: NOW - 20 * 60_000 });
+    const row = joinSessions(registered ? [member()] : [], [raw])[0];
+    assert.equal(row.source, 'magpie');
+    assert.equal(row.statusSource, 'magpie');
+    assert.equal(row.capabilities.resume, false);
+    assert.equal(view(row, NOW, {}).status, 'thinking');
+    assert.equal(view(row, NOW, {}).stuck, 0);
   }
 });
 

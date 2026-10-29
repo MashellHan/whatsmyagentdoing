@@ -17,14 +17,21 @@
     claude: ['#c96442', '#d9825f', '#b4553a', '#e09a72'],
     codex: ['#10a37f', '#2bb38f', '#0d8a6b', '#4cc3a0'],
     gemini: ['#4f7cf0', '#6b8ff5', '#3d66d6', '#8aa6f8'],
+    copilot: ['#8f5cf5', '#a06af7', '#7a47d5', '#c5a4ff'],
+    omp: ['#a96926', '#c78942', '#8d531e', '#dca45c'],
   };
-  // Official product icons, shared by both renderers and the page UI.
+  // Official product icons, shared by both renderers and the page UI (OMP: a neutral monogram).
   // Load once per page from the same origin so video capture stays readable.
   // Initials remain a fallback if an image cannot be loaded.
   const AGENT_BADGES = {
     claude: { label: 'Claude', short: 'Cl', color: '#c96442', logo: '/assets/agents/claude.png' },
     codex: { label: 'Codex', short: 'Cx', color: '#10a37f', logo: '/assets/agents/codex.png' },
     gemini: { label: 'Gemini', short: 'G', color: '#4f7cf0', logo: '/assets/agents/gemini.png' },
+    copilot: { label: 'Copilot', short: 'Co', color: '#8f5cf5', logo: '/assets/agents/copilot.svg', mono: true },
+    kimi: { label: 'Kimi Code', short: 'Ki', logo: '/assets/agents/kimi.svg', mono: true },
+    dsh: { label: 'DSH', short: 'Ds', logo: '/assets/agents/dsh.svg' },
+    grok: { label: 'Grok Build', short: 'Gr', logo: '/assets/agents/grok.svg', mono: true },
+    omp: { label: 'OMP', short: 'OMP', color: '#a96926', logo: '/assets/agents/omp.svg' },
   };
   for (const badge of Object.values(AGENT_BADGES)) {
     badge.image = new Image();
@@ -1504,6 +1511,7 @@
       c.save();
       c.globalAlpha = 1;
       if (badge.image.complete && badge.image.naturalWidth > 0) {
+        if (badge.mono && this.pal.dark) c.filter = 'invert(1)';
         c.imageSmoothingEnabled = true;
         c.imageSmoothingQuality = 'high';
         c.drawImage(badge.image, x - 9, y - 9, 18, 18);

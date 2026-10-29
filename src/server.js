@@ -21,12 +21,14 @@ const STATIC = {
   '/i18n.js': ['i18n.js', 'text/javascript; charset=utf-8'],
   '/popout.js': ['popout.js', 'text/javascript; charset=utf-8'],
 };
-const TYPES = { '.js': 'text/javascript; charset=utf-8', '.glb': 'model/gltf-binary', '.png': 'image/png', '.json': 'application/json' };
+const TYPES = { '.js': 'text/javascript; charset=utf-8', '.glb': 'model/gltf-binary', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
 // 3D models, served as-is (3D view only).
 const MOUNTS = { '/assets/': path.join(__dirname, '..', 'assets') };
 const scenes = require('./scenes');
 const updater = require('./update');
 const { RulesReader } = require('./rules');
+const { ompResumeCommand } = require('./omp');
+const { dayKey } = require('./parsers');
 
 function serveFile(res, root, rel) {
   const file = path.normalize(path.join(root, rel));
@@ -48,17 +50,23 @@ function view(s, now, { privacy = true }) {
   const quiet = now - (s.lastEventAt || s.mtime || now);
   let status = s.status;
   if ((s.statusSource || s.source) !== 'herdr') {
-    if (status === 'typing' && quiet > 45_000) status = 'done';
-    if (status === 'thinking' && quiet > 15 * 60_000) status = 'idle';
+    if (status === 'typing' && !s.explicitLifecycle && quiet > 45_000) status = 'done';
+    if (status === 'typing' && s.explicitLifecycle && quiet > 15 * 60_000) status = 'idle';
+    if (status === 'thinking' && s.source !== 'magpie' && quiet > 15 * 60_000) status = 'idle';
     if (status === 'tool' && quiet > 45 * 60_000) status = 'idle';
     if ((status === 'waiting' || status === 'error') && quiet > 2 * 3600_000) status = 'idle';
   }
+  // Still "active" but silent for a while: likely stuck (a hung tool, a lost prompt).
+  // Herdr lifecycle and gateway observations do not establish log silence.
+  const logActivity = (s.statusSource || s.source) !== 'herdr' && s.source !== 'magpie';
+  const stuckAfter = logActivity ? (status === 'tool' ? 10 * 60_000 : status === 'thinking' ? 8 * 60_000 : Infinity) : Infinity;
+  const stuck = quiet > stuckAfter ? Math.floor(quiet / 60_000) : 0;
 
   const out = {
     key: s.key || `${s.agent}:${s.id}`,
     source: s.source || 'log',
     sourceStatus: (s.statusSource || s.source) === 'herdr' ? s.sourceStatus : status,
-    statusSource: s.statusSource || (s.source === 'herdr' ? 'herdr' : 'log'),
+    statusSource: s.statusSource || (['herdr', 'magpie'].includes(s.source) ? s.source : 'log'),
     herdrStatus: s.herdrStatus || (s.source === 'herdr' ? s.sourceStatus : null),
     logKey: s.logKey || null,
     logSessionId: s.logSessionId || null,
@@ -70,17 +78,21 @@ function view(s, now, { privacy = true }) {
     tabId: s.tabId || null,
     role: s.role || 'member',
     presence: s.presence || 'fresh',
-    capabilities: s.capabilities || { resume: true },
+    capabilities: s.source === 'magpie' ? { resume: false } : s.capabilities || { resume: true },
     agent: s.agent,
+    ...(s.source === 'magpie' ? { source: s.source, agentName: s.agentName } : {}),
     id: s.id,
     sessionId: s.sessionId || null,
     parentId: s.parentId,
     subagent: s.subagent,
     cwd: s.cwd,
-    project: s.cwd ? path.basename(s.cwd) : null,
+    project: s.cwd ? `${s.agent === 'copilot' ? 'workspace-' : ''}${path.basename(s.cwd)}` : null,
     title: s.title,
     model: s.model,
     status,
+    stuck,
+    context: s.context ? { used: s.context, window: s.contextWindow || null } : null,
+    today: s.daily && s.daily.day === dayKey(now) ? { turns: s.daily.turns, tokens: s.daily.tokens } : null,
     activity: status === 'tool' || status === 'waiting' ? s.activity : null,
     prompt: s.prompt,
     reply: s.reply,
@@ -89,6 +101,11 @@ function view(s, now, { privacy = true }) {
     lastEventAt: s.lastEventAt || s.mtime,
     startedAt: s.startedAt,
   };
+  if (s.agent === 'omp' && s.source !== 'magpie') {
+    out.ompProfile = s.ompProfile || null;
+    // OMP subagents can't be resumed on their own.
+    out.resumeCommand = s.subagent ? null : ompResumeCommand(s);
+  }
   if (privacy) {
     out.prompt = out.reply = out.title = out.error = null;
     if (out.activity) out.activity = out.activity.split(/[:\s]/)[0];
@@ -107,13 +124,29 @@ function promptLanguage(raw) {
   return guessFromPrompts(recent);
 }
 
+// Today's totals across every session seen today, main sessions and subagents alike.
+function summary(sessions, now) {
+  // Folder names are keys here, so no prototype: a project called __proto__ stays a project.
+  const out = { day: dayKey(now), turns: 0, tokens: 0, agents: 0, byAgent: Object.create(null), projects: Object.create(null) };
+  for (const s of sessions) {
+    if (!s.today) continue;
+    out.agents += 1;
+    out.turns += s.today.turns;
+    out.tokens += s.today.tokens;
+    const a = (out.byAgent[s.agent] ||= { sessions: 0, turns: 0, tokens: 0 });
+    a.sessions += 1; a.turns += s.today.turns; a.tokens += s.today.tokens;
+    if (s.project) out.projects[s.project] = (out.projects[s.project] || 0) + s.today.turns;
+  }
+  return out;
+}
+
 function snapshot(watcher, opts = {}) {
   const now = Date.now();
   const raw = watcher.sessions();
   const sessions = raw.map((s) => view(s, now, opts));
   sessions.sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
   const teams = watcher.teams ? watcher.teams() : sessions.length ? [{ id: 'ungrouped', workspaceId: null, name: opts.demo ? '演示小屋' : '未分组', label: '未分组', presence: 'fresh' }] : [];
-  return { now, lang: opts.demo || opts.privacy !== false ? null : promptLanguage(raw), sessions, teams,
+  return { now, lang: opts.demo || opts.privacy !== false ? null : promptLanguage(raw), sessions, teams, summary: summary(sessions, now),
     privacy: opts.privacy !== false, source: watcher.sourceInfo?.() || { kind: opts.demo ? 'demo' : 'logs', presence: 'fresh' } };
 }
 
@@ -183,9 +216,14 @@ function createServer(watcher, opts = {}, { onShutdown, rulesReader } = {}) {
       fs.createReadStream(path.join(PUBLIC, file)).pipe(res);
     } else if (Object.keys(MOUNTS).some((m) => url.pathname.startsWith(m))) {
       const m = Object.keys(MOUNTS).find((k) => url.pathname.startsWith(k));
-      serveFile(res, MOUNTS[m], decodeURIComponent(url.pathname.slice(m.length)));
+      let rel;
+      try { rel = decodeURIComponent(url.pathname.slice(m.length)); }
+      catch { res.writeHead(400).end(); return; }
+      serveFile(res, MOUNTS[m], rel);
     } else if (url.pathname.startsWith('/scenes/')) {
-      const rel = decodeURIComponent(url.pathname.slice('/scenes/'.length));
+      let rel;
+      try { rel = decodeURIComponent(url.pathname.slice('/scenes/'.length)); }
+      catch { res.writeHead(400).end(); return; }
       const [id, ...rest] = rel.split('/');
       const dir = scenes.sceneDir(id);
       if (!dir) res.writeHead(404).end();

@@ -42,6 +42,54 @@ test('push side hashes member keys and marks unreadable source stale', async () 
   assert.equal(shouldSend('b', { sig: 'a', sentAt: 0 }, 1), true);
 });
 
+test('remote snapshots retain new providers and gateway provenance without new private fields', async () => {
+  const { sanitizeSnapshot } = await load('cloudflare/shared/whitelist.mjs');
+  const { prepare } = await load('cloudflare/push/push.mjs');
+  const providers = ['copilot', 'omp', 'kimi', 'dsh', 'grok'];
+  const raw = { ...RAW, summary: { projects: { PRIVATE_PROJECT: 4 }, tokens: 1234 },
+    sessions: providers.map(agent => ({ ...RAW.sessions[0], agent, source: 'magpie', statusSource: 'magpie',
+      context: { used: 500, window: 1000 }, today: { turns: 4, tokens: 1234 }, ompProfile: 'PRIVATE_PROFILE', resumeCommand: 'PRIVATE_COMMAND' })) };
+  const out = sanitizeSnapshot(prepare(raw, true));
+  assert.deepEqual(out.sessions.map(s => s.agent), providers);
+  assert.ok(out.sessions.every(s => s.source === 'magpie' && s.statusSource === 'magpie'));
+  for (const forbidden of ['PRIVATE', 'summary', 'context', 'today', 'ompProfile', 'resumeCommand']) {
+    assert.equal(JSON.stringify(out).includes(forbidden), false, forbidden);
+  }
+});
+
+test('authenticated remote assets include new provider SVGs while local rules remain inaccessible', async t => {
+  const { subtle } = globalThis.crypto;
+  const pair = await subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const jwk = { ...await subtle.exportKey('jwk', pair.publicKey), kid: 'fixture-key' };
+  const { accessKeys } = await load('cloudflare/viewer/access.mjs');
+  const team = 'https://asset-fixture.cloudflareaccess.com';
+  await accessKeys(team, async () => Response.json({ keys: [jwk] }));
+  const seconds = Math.floor(Date.now() / 1000);
+  const b64 = value => Buffer.from(value).toString('base64url');
+  const data = `${b64(JSON.stringify({ alg: 'RS256', kid: jwk.kid }))}.${b64(JSON.stringify({ iss: team, aud: ['fixture-aud'], sub: 'fixture', iat: seconds, exp: seconds + 600, email: 'fixture@example.test' }))}`;
+  const token = `${data}.${b64(await subtle.sign('RSASSA-PKCS1-v1_5', pair.privateKey, Buffer.from(data)))}`;
+  const { default: worker } = await load('cloudflare/viewer/worker.mjs');
+  const fs = require('node:fs');
+  const { execFileSync } = require('node:child_process');
+  execFileSync(process.execPath, [path.join(__dirname, '../cloudflare/build.mjs')]);
+  const requested = [];
+  const env = { VIEWER_HOST: 'fixture.example.test', ACCESS_TEAM_URL: team, ACCESS_AUD: 'fixture-aud', ALLOWED_VIEWER_EMAIL: 'fixture@example.test',
+    ASSETS: { fetch: async request => { const asset = new URL(request.url || request).pathname; requested.push(asset); return new Response(fs.readFileSync(path.join(__dirname, '../cloudflare/dist', asset)), { headers: { 'content-type': 'image/svg+xml' } }); } } };
+  const request = (asset, authenticated = true) => worker.fetch(new Request(`https://${env.VIEWER_HOST}${asset}`, {
+    headers: authenticated ? { 'cf-access-jwt-assertion': token } : {},
+  }), env);
+  for (const provider of ['copilot', 'omp', 'kimi', 'dsh', 'grok']) {
+    const asset = `/assets/agents/${provider}.svg`;
+    const response = await request(asset);
+    assert.equal(response.status, 200, provider);
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(await response.text(), fs.readFileSync(path.join(__dirname, '..', asset), 'utf8'));
+    assert.equal((await request(asset, false)).status, 403);
+  }
+  for (const asset of ['/rules-ui.js', '/api/rules', '/assets/agents/README.md']) assert.equal((await request(asset)).status, 404);
+  assert.equal(requested.length, 5, 'only authenticated, allowed assets reach the asset binding');
+});
+
 test('viewer shows mini-1 offline after 60s without a push', async () => {
   const shim = require('../cloudflare/viewer/remote-shim.js');
   const shared = await load('cloudflare/shared/whitelist.mjs');

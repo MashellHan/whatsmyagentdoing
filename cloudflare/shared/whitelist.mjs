@@ -9,7 +9,8 @@ export const HEARTBEAT_MS = 20_000;
 
 const STATUSES = new Set(['thinking', 'tool', 'typing', 'waiting', 'done', 'idle', 'error', 'interrupted']);
 const SOURCE_STATUSES = new Set(['working', 'blocked', 'done', 'idle', 'unknown', ...STATUSES]);
-const AGENTS = new Set(['claude', 'codex', 'gemini', 'unknown']);
+const AGENTS = new Set(['claude', 'codex', 'gemini', 'copilot', 'omp', 'kimi', 'dsh', 'grok', 'unknown']);
+const SOURCES = new Set(['herdr', 'log', 'magpie']);
 const ID = /^[A-Za-z0-9_-]{1,40}$/;
 const KEY = /^k_[0-9a-f]{16}$/;
 const MAX_TEAMS = 50;
@@ -28,7 +29,7 @@ function team(t) {
 
 function session(s, index) {
   if (!s || typeof s !== 'object') return null;
-  const via = s.statusSource === 'herdr' ? 'herdr' : 'log';
+  const via = pick(s.statusSource, SOURCES, 'log');
   return {
     key: KEY.test(s.key || '') ? s.key : `k_${index.toString(16).padStart(16, '0')}`,
     teamId: ID.test(s.teamId || '') ? s.teamId : 'ungrouped',
@@ -37,7 +38,7 @@ function session(s, index) {
     status: pick(s.status, STATUSES, 'idle'),
     sourceStatus: pick(s.sourceStatus, SOURCE_STATUSES, 'unknown'),
     statusSource: via,
-    source: s.source === 'herdr' ? 'herdr' : 'log',
+    source: pick(s.source, SOURCES, 'log'),
     presence: presence(s.presence),
     subagent: s.subagent === true,
     lastEventAt: time(s.lastEventAt),

@@ -55,6 +55,18 @@ async function settings(page) { if (await page.locator('#settingsMenu').getAttri
     assert.match(await page.locator('#members [data-source=herdr].source-badge').innerText(), /Herdr 回退 · unknown/);
     console.log('PASS town enters original office; three providers, correct work/wander modes, roster, source and privacy');
 
+    const today = require('../src/parsers').dayKey(Date.now());
+    members = members.map(s => s.key === 'p0' ? { ...s, cwd: '/fixture/inside-project', daily: { day: today, turns: 2, tokens: 1200 } }
+      : s.key === 'other-team' ? { ...s, cwd: '/fixture/outside-project', daily: { day: today, turns: 90, tokens: 9_000_000 } } : s);
+    w.emit('change');
+    await page.waitForFunction(() => state.data.sessions.some(s => s.today));
+    assert.equal(await page.locator('#todayTokens').innerText(), '1.2k');
+    await page.click('#todayMenu > summary');
+    assert.match(await page.locator('#todayPanel').innerText(), /inside-project/);
+    assert.doesNotMatch(await page.locator('#todayPanel').innerText(), /outside-project|9\.00M/);
+    await page.keyboard.press('Escape');
+    console.log('PASS Today totals and project names are scoped to the selected team');
+
     await page.click('#viewSeg [data-v=list]');
     assert.equal(await page.locator('#main .card').count(), 9, 'all eight log states plus unknown fallback');
     assert.deepEqual(await page.locator('#main .card').evaluateAll(nodes => [...new Set(nodes.map(n => n.querySelector('.agent').classList[1]))].sort()), ['claude', 'codex', 'gemini']);

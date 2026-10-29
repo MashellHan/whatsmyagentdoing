@@ -1,5 +1,8 @@
 # Provider icons
 
+`omp.svg` is a neutral OMP monogram made for this interface. It is not an
+official oh-my-pi logo and contains no external resources.
+
 These official product icons identify the providers of sessions. They are served
 locally so offline use and canvas/video capture do not depend on a third party.
 Brand marks belong to their respective owners; this project is not endorsed by
@@ -14,6 +17,23 @@ Retrieved 2026-10-25, artwork unchanged:
   OpenAI desktop app, `ChatGPT.app/Contents/Resources/app.asar` →
   `webview/assets/codex-app-ga-logo-3e5209898ca3.png`.
   Brand reference: https://openai.com/brand/.
+- `copilot.svg`: the GitHub Copilot mark, retrieved 2026-10-29 from
+  Simple Icons (https://cdn.jsdelivr.net/npm/simple-icons@13.21.0/icons/githubcopilot.svg).
+  Brand reference: https://github.com/logos.
 - `gemini.png`: Google's official Gemini product icon, downloaded from
   https://www.gstatic.com/lamda/images/gemini_sparkle_4g_512_lt_f94943af3be039176192d.png
   (linked by https://gemini.google.com/).
+
+Added 2026-10-26 from Magpie's bundled client icons, with the SVG artwork unchanged:
+
+- `kimi.svg`: `internal/gui/assets/icons/kimi.svg`.
+- `dsh.svg`: `internal/gui/assets/icons/deepseek-color.svg`, the icon Magpie
+  assigns to DeepSeek Harness.
+- `grok.svg`: `internal/gui/assets/icons/xai.svg`, the icon Magpie assigns to
+  Grok Build.
+
+Source project: https://github.com/yetone/magpie. Its MIT notice is included
+in `MAGPIE-LICENSE`; trademark ownership remains with the respective brands.
+Monochrome Kimi and xAI marks retain their transparent backgrounds. The UI
+displays them in black on light themes and white on dark themes; the SVG
+geometry is not modified.

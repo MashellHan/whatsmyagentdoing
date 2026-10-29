@@ -6,7 +6,7 @@ process.env.WMAD_NO_UPDATE_CHECK = '1';
 
 const http = require('http');
 const { spawn } = require('child_process');
-const { Watcher, CLAUDE_DIR, CODEX_DIR, GEMINI_DIR } = require('../src/watcher');
+const { Watcher, CLAUDE_DIR, CODEX_DIR, GEMINI_DIR, CLIENT_DIRS, ompDirs } = require('../src/watcher');
 const { DemoWatcher } = require('../src/demo');
 const { HerdrWatcher } = require('../src/herdr');
 const { TeamWatcher } = require('../src/teams');
@@ -14,17 +14,19 @@ const fs = require('fs');
 const path = require('path');
 const scenes = require('../src/scenes');
 const updater = require('../src/update');
+const hook = require('../src/hook');
 const { createServer, snapshot } = require('../src/server');
 const pkg = require('../package.json');
 
 const HELP = `whatsmyagentdoing ${pkg.version}
-See what every Claude Code, Codex and Gemini CLI agent on this machine is doing, live.
+See what every Claude Code, Codex, Gemini CLI, Copilot CLI, OMP, Kimi Code, DSH and Grok Build agent is doing, live.
 
 Usage: node bin/cli.js [options]   (Codex: $myoffice; Claude Code: /myoffice)
 
 Options:
   -p, --port <n>    Port to serve on (default 4546)
   --hours <n>       Show sessions active in the last n hours (default 24)
+  --omp-dir <path>  OMP sessions root (or a direct --session-dir directory)
   --no-open         Don't open the browser
   --private         Hide prompts, replies and titles (always enabled)
   --logs            Read local logs instead of Herdr; show an ungrouped house
@@ -35,6 +37,8 @@ Options:
   --stop            Stop a running dashboard
   --scenes          List already installed 3D scenes
   --scene <id>      Open the legacy office with an already installed scene
+  --install-hook    Optional: add a Claude Code hook so permission prompts show "Waiting for you"
+  --uninstall-hook  Remove that hook again
   -h, --help        Show this help
 
 Default: Herdr team identity + exact session log status (read only).
@@ -43,7 +47,16 @@ Outside Herdr, use --herdr-session with a name from herdr session list --json.
   ${CLAUDE_DIR}
   ${CODEX_DIR}
   ${GEMINI_DIR}
-Override with CLAUDE_CONFIG_DIR / CODEX_HOME / GEMINI_CLI_HOME.`;
+  ${Object.values(CLIENT_DIRS).join('\n  ')}
+  ${ompDirs().map(x => x.dir).join('\n  ')}
+Override with CLAUDE_CONFIG_DIR / CODEX_HOME / GEMINI_CLI_HOME /
+  WMAD_OMP_SESSIONS_DIR (or --omp-dir); OMP also honors PI_CODING_AGENT_DIR.
+OMP profiles under ~/.omp/profiles are discovered automatically.
+Other clients: KIMI_CODE_HOME / DSH_HOME / GROK_HOME.
+Optional Magpie: WMAD_MAGPIE_URL=http://127.0.0.1:3430
+and WMAD_MAGPIE_KEY (web sign-in key, server-side only).
+For multiple local instances, WMAD_MAGPIE_SOURCES is a JSON array
+of {url, key} objects, used instead of the single-source variables.`;
 
 function parseArgs(argv) {
   const o = { port: 4546, hours: 24, open: true, privacy: true, logs: false, herdrSession: null, teamMap: path.join(__dirname, '../config/team-houses.json'), json: false, demo: false, stop: false, scenes: false, scene: null, removeScene: null };
@@ -55,6 +68,11 @@ function parseArgs(argv) {
     else if (a.startsWith('--port=')) o.port = Number(a.slice(7));
     else if (a === '--hours') o.hours = Number(argv[++i]);
     else if (a.startsWith('--hours=')) o.hours = Number(a.slice(8));
+    else if (a === '--omp-dir') {
+      if (!argv[i + 1] || argv[i + 1].startsWith('--')) { console.error('--omp-dir requires a path'); process.exit(1); }
+      o.ompDir = argv[++i];
+    }
+    else if (a.startsWith('--omp-dir=')) o.ompDir = a.slice(10);
     else if (a === '--no-open') o.open = false;
     else if (a === '--private') o.privacy = true;
     else if (a === '--logs') o.logs = true;
@@ -72,6 +90,9 @@ function parseArgs(argv) {
     else if (a === '--scene') o.scene = argv[++i];
     else if (a.startsWith('--scene=')) o.scene = a.slice(8);
     else if (a === '--remove-scene') throw new Error('Scene mutations are disabled in this read-only build.');
+    else if (a === '--hook') o.hook = true;
+    else if (a === '--install-hook') o.installHook = true;
+    else if (a === '--uninstall-hook') o.uninstallHook = true;
     else { console.error(`Unknown option: ${a}\n\n${HELP}`); process.exit(1); }
   }
   if (!Number.isInteger(o.port) || o.port < 1024 || o.port > 65535 || !Number.isFinite(o.hours) || o.hours <= 0) { console.error(HELP); process.exit(1); }
@@ -114,6 +135,26 @@ function stopAt(port) {
 async function main() {
   const o = parseArgs(process.argv.slice(2));
 
+  if (o.hook) {
+    // Run by Claude Code on every Notification. Never fail or print: it must not disturb the session.
+    let input = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (c) => { if (input.length < 65536) input += c; });
+    process.stdin.on('end', () => { try { hook.record(input); } catch {} });
+    return;
+  }
+
+  if (o.installHook || o.uninstallHook) {
+    try {
+      if (o.installHook) console.log(`Installed the approval hook in ${hook.install()}. New and restarted Claude Code sessions will show "Waiting for you" on permission prompts.`);
+      else console.log(hook.uninstall() ? `Removed the approval hook from ${hook.SETTINGS()}.` : 'The approval hook is not installed.');
+    } catch (e) {
+      console.error(`Could not update ${hook.SETTINGS()}: ${e.message}`);
+      process.exitCode = 1;
+    }
+    return;
+  }
+
   if (o.scenes) {
     const have = scenes.installed();
     const name = (x) => (x.name && (x.name.en || Object.values(x.name)[0])) || x.id;
@@ -145,14 +186,27 @@ async function main() {
     if (process.env.HERDR_ENV !== '1' && !o.herdrSession) throw new Error('Start from a Herdr-managed pane, pass --herdr-session <name>, or use --logs/--demo.');
     if (fs.existsSync(o.teamMap)) teamMap = JSON.parse(fs.readFileSync(o.teamMap, 'utf8'));
   }
-  const watcher = o.demo ? new DemoWatcher() : o.logs ? new Watcher({ hours: o.hours })
-    : new TeamWatcher({ herdr: new HerdrWatcher({ teamMap, session: o.herdrSession }), logs: new Watcher({ hours: o.hours }) });
+  const logOptions = { hours: o.hours, ompDir: o.ompDir };
+  const watcher = o.demo ? new DemoWatcher() : o.logs ? new Watcher(logOptions)
+    : new TeamWatcher({ herdr: new HerdrWatcher({ teamMap, session: o.herdrSession }), logs: new Watcher(logOptions) });
 
   if (o.json) {
-    if (o.demo) watcher.start();
-    else { await watcher.tick(); if (o.logs) { watcher.lastScan = 0; watcher.tick(); } }
-    console.log(JSON.stringify(snapshot(watcher, o), null, 2));
-    watcher.stop();
+    try {
+      if (o.demo) watcher.start();
+      else {
+        await watcher.tick();
+        const logs = o.logs ? watcher : watcher.logs;
+        logs.lastScan = 0;
+        logs.tick();
+        await Promise.all(logs.magpies.map(source => source.poll()));
+        for (const [i, source] of logs.magpies.entries()) {
+          if (source.error) throw new Error(`Magpie source ${i + 1}: ${source.error}`);
+        }
+      }
+      console.log(JSON.stringify(snapshot(watcher, o), null, 2));
+    } finally {
+      watcher.stop();
+    }
     return;
   }
 

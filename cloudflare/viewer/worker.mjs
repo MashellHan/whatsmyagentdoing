@@ -5,7 +5,7 @@ import { verifyAccessJwt } from './access.mjs';
 
 const PAGES = { '/': '/town.html', '/town': '/town.html', '/office': '/index.html', '/office/': '/index.html' };
 const FILES = new Set(['/town.js', '/town.css', '/team-office.css', '/office.js', '/office3d.js', '/i18n.js', '/popout.js', '/remote-shim.js']);
-const ASSET = /^\/assets\/[A-Za-z0-9_\/.-]+\.(png|glb|json)$/;
+const ASSET = /^\/assets\/[A-Za-z0-9_\/.-]+\.(png|svg|glb|json)$/;
 const SECURITY = {
   'cache-control': 'no-store',
   'x-content-type-options': 'nosniff',

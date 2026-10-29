@@ -1,6 +1,6 @@
 ---
 name: myoffice
-description: Open a local dashboard of Herdr teams and Claude Code, Codex, and Gemini CLI activity. Use when the user invokes myoffice, asks what their local agents or Herdr teams are doing, or wants to start, stop, or restart the office dashboard.
+description: Open a local dashboard of Herdr teams and Claude Code, Codex, Gemini CLI, Copilot CLI, OMP, Kimi Code, DeepSeek Harness and Grok Build activity. Use when the user invokes myoffice, asks what their local agents or Herdr teams are doing, or wants to start, stop, or restart the office dashboard.
 ---
 
 # myoffice
@@ -61,6 +61,8 @@ Confirm the resulting source and teams before reporting a successful restart.
 - `--json`: print a snapshot and exit. Keep the chosen `--herdr-session` or
   `--logs` option when summarizing agents in chat.
 - `--hours 4`: include local logs active in the last four hours (default 24).
+- `--omp-dir PATH`: select an OMP sessions root or direct session directory;
+  see [OMP support](docs/omp.md) for profiles and resume limitations.
 - `--team-map FILE`: use explicit, local leader/member mappings. Do not infer
   roles from names or pane order.
 - `--scenes`: list built-in and already-installed scenes.
@@ -71,3 +73,15 @@ scene downloads/removal are disabled. Use the repository's normal installation
 workflow for updates instead of `--update`.
 For team identity, status binding, and role configuration, see
 [Team Houses](docs/TEAM-HOUSES.md).
+
+## Optional approval hook
+
+If the user wants Claude Code permission prompts to show as "Waiting for you"
+(Claude Code doesn't log them), offer `node "<base directory>/bin/cli.js" --install-hook`.
+It adds one Notification hook to their Claude Code settings; `--uninstall-hook` removes it.
+Ask before running it, since it changes their settings.
+
+Sessions are read locally from the agents' own session folders (`~/.claude/projects`,
+`~/.codex/sessions`, `~/.gemini/tmp`, `~/.copilot/session-state`, `~/.omp`, `~/.kimi-code`,
+`~/.dsh`, `~/.grok`). Optional Magpie ingestion must be explicitly configured
+through its local URL and server-side sign-in key; see the README.

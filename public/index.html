@@ -23,6 +23,8 @@
     --claude: #c96442;
     --codex: #10a37f;
     --gemini: #4f7cf0;
+    --copilot: #8f5cf5;
+    --omp: #a96926;
     --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
   }
   @media (prefers-color-scheme: dark) {
@@ -85,7 +87,7 @@
   #sceneSeg { display: grid; grid-template-columns: 1fr 1fr; border: 0; padding: 0; gap: 6px; }
   #sceneSeg button { text-align: left; padding: 8px 10px; background: var(--bg); }
   #sceneSeg button.on { background: var(--line); color: var(--ink); box-shadow: inset 0 0 0 1px var(--faint); }
-  #agentSeg { display: flex; }
+  #agentSeg { display: flex; flex-wrap: wrap; }
   #agentSeg button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 8px 6px; }
   .setting-toggles { display: grid; gap: 12px; margin-top: 14px; }
   .setting-toggles .tog { color: var(--ink); gap: 8px; }
@@ -122,6 +124,9 @@
   .top { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .agent { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--muted); flex: none; }
   .agent-logo { width: 20px; height: 20px; object-fit: contain; padding: 1px; flex: none; }
+  @media (prefers-color-scheme: dark) {
+    .agent-logo.mono { filter: invert(1); }
+  }
   .project { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .time { margin-left: auto; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
   .title { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -133,6 +138,24 @@
   .r { color: var(--ink); opacity: .85; }
   .r::before { content: "← "; color: var(--faint); }
   .err { font-size: 12.5px; color: var(--error); }
+  .today-tokens { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .today-panel { width: min(340px, calc(100vw - 32px)); }
+  .today-big { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+  .today-big div { padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+  .today-big b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .today-big span, .today-note, .today-head { font-size: 12px; color: var(--muted); }
+  .today-head { margin: 12px 0 6px; font-weight: 600; }
+  .today-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
+  .today-row .n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .today-note { margin-top: 12px; line-height: 1.5; }
+  .ctx { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--faint); }
+  .ctx .bar { flex: 1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+  .ctx .bar i { display: block; height: 100%; border-radius: 2px; background: var(--done); }
+  .ctx.warn .bar i { background: var(--waiting); }
+  .ctx.full .bar i { background: var(--error); }
+  .stuck { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--error); white-space: nowrap; }
+  .ui-ico { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .card.is-stuck { border-color: color-mix(in srgb, var(--error) 45%, var(--line)); }
   .foot { display: flex; gap: 8px; align-items: center; color: var(--faint); font-size: 11.5px; min-width: 0; }
   .foot .model { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .copy { margin-left: auto; border: 0; background: none; color: var(--faint); font: inherit; font-size: 11.5px; cursor: pointer; padding: 0; flex: none; }
@@ -234,6 +257,10 @@
       </div>
       <span class="toolbar-space" aria-hidden="true"></span>
       <button class="btn" id="pipBtn" hidden></button>
+      <details class="settings" id="todayMenu">
+        <summary class="btn" aria-controls="todayPanel"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5h17"/><rect x="5" y="11" width="3.2" height="7" rx="1"/><rect x="10.4" y="6" width="3.2" height="12" rx="1"/><rect x="15.8" y="13.5" width="3.2" height="4.5" rx="1"/></svg><span data-t="today"></span> <span class="today-tokens" id="todayTokens"></span></summary>
+        <div class="settings-panel today-panel" id="todayPanel"></div>
+      </details>
       <details class="settings" id="settingsMenu">
         <summary class="btn" aria-controls="settingsPanel"><span data-t="settings"></span><span class="filter-active" id="activeFilter" hidden></span></summary>
         <div class="settings-panel" id="settingsPanel">
@@ -245,14 +272,12 @@
             <span class="setting-label" id="filterLabel" data-t="agents"></span>
             <div class="seg" id="agentSeg" role="group" aria-labelledby="filterLabel">
               <button data-v="all" class="on" data-t="all"></button>
-              <button data-v="claude"><img class="agent-logo" src="/assets/agents/claude.png" alt="">Claude</button>
-              <button data-v="codex"><img class="agent-logo" src="/assets/agents/codex.png" alt="">Codex</button>
-              <button data-v="gemini"><img class="agent-logo" src="/assets/agents/gemini.png" alt="">Gemini</button>
             </div>
             <div class="setting-toggles">
               <label class="tog"><input type="checkbox" id="showSub"> <span data-t="subagents"></span></label>
               <label class="tog" id="idleToggle"><input type="checkbox" id="showIdle"> <span data-t="showIdle"></span></label>
               <label class="tog" id="agentBadgeToggle"><input type="checkbox" id="showAgent"> <span data-t="showAgent"></span></label>
+              <label class="tog" id="soundToggle"><input type="checkbox" id="sound"> <span data-t="sound"></span></label>
             </div>
           </div>
           <div class="setting-group">
@@ -284,7 +309,7 @@
     </div>
     <div class="office loading" id="office"><div class="office-loader"><div class="spin"></div><span id="loaderText"></span></div></div>
     <div class="legend" id="legend"></div>
-    <div class="legend" id="agentLegend"></div>
+    <div class="legend" id="agentLegend" hidden></div>
   </div>
   <main id="main"></main>
   </div>
@@ -339,13 +364,13 @@ const store = (() => {
   return { get, set };
 })();
 
-const PREF_DEFAULTS = { view: 'office', quality: 'mid', scene: 'office', agent: 'all', showSub: false, showIdle: !!TEAM, showAgent: true, lang: 'auto' };
+const PREF_DEFAULTS = { view: 'office', quality: 'mid', scene: 'office', agent: 'all', showSub: false, showIdle: !!TEAM, showAgent: true, sound: false, lang: 'auto' };
 function validPreference(k, v) {
   if (!Object.hasOwn(PREF_DEFAULTS, k)) return false;
   if (typeof PREF_DEFAULTS[k] === 'boolean') return typeof v === 'boolean';
   if (k === 'view') return ['office', 'list'].includes(v);
   if (k === 'quality') return ['mid', 'high'].includes(v);
-  if (k === 'agent') return ['all', ...Object.keys(OFFICE_AGENT_BADGES)].includes(v);
+  if (k === 'agent') return typeof v === 'string' && /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(v) && !Object.hasOwn(Object.prototype, v);
   if (k === 'lang') return v === 'auto' || Object.hasOwn(I18N, v);
   return typeof v === 'string' && /^[a-z0-9-]+$/.test(v);
 }
@@ -379,12 +404,13 @@ const state = {
   data: { now: Date.now(), sessions: [] },
   skew: 0,
   prev: new Map(),
+  prevStuck: new Set(),
   flash: new Set(),
 };
 let popout = null;
 
 const ACTIVE = new Set(['thinking', 'tool', 'typing']);
-const AGENT_NAME = { claude: 'Claude', codex: 'Codex', gemini: 'Gemini' };
+const AGENT_NAME = Object.fromEntries(Object.entries(OFFICE_AGENT_BADGES).map(([agent, badge]) => [agent, badge.label]));
 const GROUPS = [
   { key: 'needsYou', match: (s) => s === 'waiting' || s === 'error' },
   { key: 'working', match: (s) => ACTIVE.has(s) },
@@ -425,21 +451,69 @@ function timeLabel(s, now) {
 const shq = (v) => `'${String(v).replace(/'/g, `'\\''`)}'`;
 function resumeCmd(s) {
   if (s.capabilities?.resume === false || s.source === 'herdr') return '';
+  if (s.source === 'magpie') return '';
+  if (s.agent === 'omp') return s.resumeCommand || '';
   const cd = s.cwd ? `cd ${shq(s.cwd)} && ` : '';
   if (s.agent === 'claude') return `${cd}claude --resume ${shq(s.id)}`;
   if (s.agent === 'gemini') return `${cd}gemini --resume ${shq(s.sessionId || s.id)}`;
-  return `${cd}codex resume ${shq(s.id)}`;
+  if (s.agent === 'copilot') return `${cd}copilot --resume ${shq(s.sessionId || s.id)}`;
+  if (s.agent === 'kimi') return `${cd}kimi --session ${shq(s.sessionId || s.id)}`;
+  if (s.agent === 'dsh') return `${cd}dsh tui --resume ${shq(s.id)}`;
+  if (s.agent === 'grok') return `${cd}grok --resume ${shq(s.id)}`;
+  return s.agent === 'codex' ? `${cd}codex resume ${shq(s.id)}` : '';
 }
 
 function agentLogo(agent) {
   const badge = OFFICE_AGENT_BADGES[agent];
-  return badge ? `<img class="agent-logo" src="${badge.logo}" alt="" aria-hidden="true">` : '';
+  return badge ? `<img class="agent-logo${badge.mono ? ' mono' : ''}" src="${badge.logo}" alt="" aria-hidden="true">` : '';
+}
+
+function addAgentFilter(agent, name = AGENT_NAME[agent] || agent) {
+  const button = document.createElement('button');
+  button.dataset.v = agent;
+  button.innerHTML = `${agentLogo(agent)}${esc(name)}`;
+  document.getElementById('agentSeg').append(button);
+}
+
+function fmtTokens(n) {
+  if (n < 1000) return String(n);
+  if (n < 1e6) return `${(n / 1e3).toFixed(n < 1e4 ? 1 : 0)}k`;
+  return `${(n / 1e6).toFixed(n < 1e7 ? 2 : 1)}M`;
+}
+
+// How full the model's context window is, from the latest request in the log.
+function contextBar(c) {
+  if (!c || !c.window) return '';
+  const pct = Math.min(100, Math.round((c.used / c.window) * 100));
+  const tip = `${L.context} ${fmtTokens(c.used)} / ${fmtTokens(c.window)}`;
+  return `<div class="ctx${pct >= 85 ? ' full' : pct >= 60 ? ' warn' : ''}" title="${esc(tip)}"><span>${esc(L.context)}</span><span class="bar"><i style="width:${pct}%"></i></span><span>${pct}%</span></div>`;
+}
+
+function renderToday() {
+  const t = state.data.summary;
+  document.getElementById('todayMenu').hidden = !t;
+  document.getElementById('todayTokens').textContent = t && t.tokens ? fmtTokens(t.tokens) : '';
+  const panel = document.getElementById('todayPanel');
+  if (!t || !t.agents) { panel.innerHTML = `<div class="today-note">${esc(L.noUsage)}</div>`; return; }
+  const agents = Object.entries(t.byAgent).sort((a, b) => b[1].turns - a[1].turns || b[1].tokens - a[1].tokens);
+  const projects = Object.entries(t.projects).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  panel.innerHTML = `
+    <div class="today-big">
+      <div><b>${t.turns}</b><span>${esc(L.turnsL)}</span></div>
+      <div><b>${fmtTokens(t.tokens)}</b><span>${esc(L.tokensL)}</span></div>
+      <div><b>${t.agents}</b><span>${esc(L.agentsL)}</span></div>
+    </div>
+    ${agents.map(([a, v]) => `<div class="today-row">${agentLogo(a)}${esc(AGENT_NAME[a] || a)}<span class="n">${v.turns} ${esc(L.turnsL)} · ${fmtTokens(v.tokens)}</span></div>`).join('')}
+    ${projects.length ? `<div class="today-head">${esc(L.topProjects)}</div>` : ''}
+    ${projects.map(([p, n]) => `<div class="today-row">${esc(p)}<span class="n">${n} ${esc(L.turnsL)}</span></div>`).join('')}
+    <div class="today-note">${esc(L.summaryNote)}</div>`;
 }
 
 function statusSource(s) {
-  return s.statusSource || (s.source === 'herdr' ? 'herdr' : 'log');
+  return s.statusSource || (['herdr', 'magpie'].includes(s.source) ? s.source : 'log');
 }
 function sourceBadge(s) {
+  if (statusSource(s) === 'magpie') return '<span class="source-badge" data-source="magpie" title="本机 Magpie 请求观测，未关联原生日志；请求结束不代表回合完成">Magpie 请求观测</span>';
   const fallback = statusSource(s) === 'herdr';
   return `<span class="source-badge" data-source="${fallback ? 'herdr' : 'log'}" title="${fallback ? '未找到唯一的 provider + session ID 日志，回退 Herdr 状态' : '原版会话日志推断，包含原版静默超时规则'}">${fallback ? 'Herdr 回退 · ' + esc(s.herdrStatus || s.sourceStatus || 'unknown') : '会话日志'}</span>`;
 }
@@ -483,17 +557,19 @@ function card(s, now) {
   const r = showText && s.reply && !ACTIVE.has(s.status) ? `<div class="r" title="${esc(s.reply)}">${esc(s.reply)}</div>` : '';
   const err = s.error ? `<div class="err">${esc(s.error)}</div>` : '';
   const sub = s.subagent ? ` · ${L.sub}` : '';
+  const stuck = s.stuck ? `<span class="stuck"><svg class="ui-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 4.2a2 2 0 0 1 3.4 0l7.6 13.1A2 2 0 0 1 19.6 20H4.4a2 2 0 0 1-1.7-2.7z"/><path d="M12 9.5v4.2M12 16.6v.1"/></svg>${esc(L.stuck(s.stuck))}</span>` : '';
+  const ctx = contextBar(s.context);
   return `
-  <div class="card${s.subagent ? ' sub' : ''}${state.flash.has(s.key) ? ' flash' : ''}" data-s="${s.status}" data-key="${esc(s.key)}">
+  <div class="card${s.subagent ? ' sub' : ''}${s.stuck ? ' is-stuck' : ''}${state.flash.has(s.key) ? ' flash' : ''}" data-s="${s.status}" data-key="${esc(s.key)}">
     <div class="top">
-      <span class="agent ${esc(s.agent)}">${agentLogo(s.agent)}${esc(AGENT_NAME[s.agent] || s.agent)}</span>
+      <span class="agent ${esc(s.agent)}">${agentLogo(s.agent)}${esc(s.agentName || AGENT_NAME[s.agent] || s.agent)}</span>
       <span class="project" title="${esc(s.cwd)}">${esc(project)}</span>
       <span class="time" data-time="${esc(s.key)}">${esc(timeLabel(s, now))}</span>
     </div>
     ${title}
     <div class="session-source">${sourceBadge(s)}${s.paneId ? `<span>${esc(s.paneId)}</span>` : ''}${roleBadge(s)}</div>
-    <div class="status"><span class="ind"><i></i><i></i><i></i></span><span class="lbl">${esc(L[s.status] || s.status)}</span>${act}</div>
-    ${err}${q}${r}
+    <div class="status"><span class="ind"><i></i><i></i><i></i></span><span class="lbl">${esc(L[s.status] || s.status)}</span>${act}${stuck}</div>
+    ${err}${q}${r}${ctx}
     <div class="foot"><span class="model">${esc((s.model || '') + sub)}</span>${resumeCmd(s) ? `<button class="copy" data-copy="${esc(resumeCmd(s))}">${L.copy}</button>` : ''}</div>
   </div>`;
 }
@@ -517,6 +593,7 @@ function render() {
     return `<span class="chip"><span class="dot" style="color:${color}"></span>${L[g.key]} <b>${n}</b></span>`;
   }).join('');
 
+  renderToday();
   const working = count((s) => ACTIVE.has(s));
   const needs = count(GROUPS[0].match);
   document.title = (needs ? `(${needs}!) ` : working ? `(${working}) ` : '') + L.title;
@@ -536,6 +613,12 @@ function render() {
     office.update(officeList);
   }
   scheduleStageLayout();
+  const agents = new Set(officeList.map(s => s.agent));
+  const legend = document.getElementById('agentLegend');
+  const labels = Object.keys(OFFICE_AGENT_BADGES).filter(agent => agents.has(agent))
+    .map(agent => `<span>${agentLogo(agent)}${esc(AGENT_NAME[agent])}</span>`).join('');
+  if (legend.innerHTML !== labels) legend.innerHTML = labels;
+  legend.hidden = !state.showAgent || !labels;
   document.getElementById('idleToggle').style.display = officeMode ? 'none' : '';
   if (poppedOut) {
     document.getElementById('officeWrap').style.display = 'none';
@@ -573,24 +656,79 @@ function tickTimes() {
 
 function onData(data) {
   // Scope before notifications, counters, list rendering and Office updates.
-  if (TEAM) data = { ...data, sessions: data.sessions.filter(s => (s.teamId || 'ungrouped') === TEAM) };
+  if (TEAM) {
+    data = { ...data, sessions: data.sessions.filter(s => (s.teamId || 'ungrouped') === TEAM) };
+    if (data.summary) {
+      const totals = { day: data.summary.day, turns: 0, tokens: 0, agents: 0, byAgent: Object.create(null), projects: Object.create(null) };
+      for (const s of data.sessions) {
+        if (!s.today) continue;
+        totals.agents++;
+        totals.turns += s.today.turns;
+        totals.tokens += s.today.tokens;
+        const agent = (totals.byAgent[s.agent] ||= { sessions: 0, turns: 0, tokens: 0 });
+        agent.sessions++; agent.turns += s.today.turns; agent.tokens += s.today.tokens;
+        if (s.project) totals.projects[s.project] = (totals.projects[s.project] || 0) + s.today.turns;
+      }
+      data.summary = totals;
+    }
+  }
+  for (const s of data.sessions) {
+    if (!validPreference('agent', s.agent)) continue;
+    if (!Object.hasOwn(AGENT_NAME, s.agent)) AGENT_NAME[s.agent] = s.agentName || s.agent;
+    if (!document.querySelector(`#agentSeg button[data-v="${s.agent}"]`)) {
+      addAgentFilter(s.agent, s.agentName || AGENT_NAME[s.agent] || s.agent);
+    }
+  }
   state.skew = Date.now() - data.now;
   const first = state.prev.size === 0;
   state.flash.clear();
   for (const s of data.sessions) {
     const before = state.prev.get(s.key);
-    if (!first && before && ACTIVE.has(before) && (s.status === 'done' || s.status === 'waiting')) {
+    const wasStuck = state.prevStuck.has(s.key);
+    const needsYou = s.status === 'waiting' || s.status === 'error';
+    let alert = null;
+    if (!first && before && before !== s.status && (needsYou || (s.status === 'done' && ACTIVE.has(before)))) {
+      alert = s.status === 'done' ? L.doneNote(s.project || s.agent) : `${s.project || s.agent}: ${L[s.status]}`;
+    } else if (!first && s.stuck && !wasStuck) {
+      alert = `${s.project || s.agent}: ${L.stuck(s.stuck)}`;
+    }
+    if (alert) {
       state.flash.add(s.key);
-      if (!PIP && !s.subagent && window.Notification && Notification.permission === 'granted') {
-        try { new Notification(s.status === 'done' ? L.doneNote(s.project || s.agent) : `${s.project || s.agent}: ${L.waiting}`, { body: s.reply || s.activity || '', tag: s.key }); } catch {}
+      if (!PIP && !s.subagent) {
+        if (window.Notification && Notification.permission === 'granted') {
+          try { new Notification(alert, { body: s.reply || s.activity || '', tag: s.key }); } catch {}
+        }
+        if (state.sound) chime(s.status === 'done' && !s.stuck ? 'done' : 'attention');
       }
     }
     state.prev.set(s.key, s.status);
+    if (s.stuck) state.prevStuck.add(s.key); else state.prevStuck.delete(s.key);
   }
   state.data = data;
   state.loaded = true;
+  syncControls();
   applyLang(chooseLang(data.lang));
   render();
+}
+
+// A short synthesized chime, so no audio file is bundled: one tone when a turn
+// finishes, two rising tones when an agent needs you or looks stuck.
+let audio = null;
+function chime(kind) {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+    const notes = kind === 'done' ? [660] : [587, 880];
+    notes.forEach((f, i) => {
+      const t = audio.currentTime + i * 0.16, o = audio.createOscillator(), g = audio.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      o.connect(g).connect(audio.destination);
+      o.start(t); o.stop(t + 0.4);
+    });
+  } catch {}
 }
 
 function connect() {
@@ -602,13 +740,21 @@ function connect() {
 
 // Native disclosure keeps settings keyboard-accessible without a modal focus trap.
 const settingsMenu = document.getElementById('settingsMenu');
+const todayMenu = document.getElementById('todayMenu');
+todayMenu.addEventListener('toggle', () => { if (todayMenu.open) settingsMenu.open = false; });
+settingsMenu.addEventListener('toggle', () => { if (settingsMenu.open) todayMenu.open = false; });
 document.addEventListener('click', (e) => {
   if (!settingsMenu.contains(e.target)) settingsMenu.open = false;
+  if (!todayMenu.contains(e.target)) todayMenu.open = false;
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && settingsMenu.open) {
     settingsMenu.open = false;
     settingsMenu.querySelector('summary').focus();
+  }
+  if (e.key === 'Escape' && todayMenu.open) {
+    todayMenu.open = false;
+    todayMenu.querySelector('summary').focus();
   }
 });
 settingsMenu.addEventListener('toggle', () => { if (settingsMenu.open) hideTip(); });
@@ -630,6 +776,11 @@ const showIdle = document.getElementById('showIdle');
 const showAgent = document.getElementById('showAgent');
 showSub.addEventListener('change', () => { state.showSub = showSub.checked; store.set('showSub', state.showSub); render(); });
 showIdle.addEventListener('change', () => { state.showIdle = showIdle.checked; store.set('showIdle', state.showIdle); render(); });
+const soundBox = document.getElementById('sound');
+soundBox.addEventListener('change', () => {
+  state.sound = soundBox.checked; store.set('sound', state.sound);
+  if (state.sound) chime('done'); // a preview, and the click unlocks audio for later alerts
+});
 showAgent.addEventListener('change', () => { state.showAgent = showAgent.checked; store.set('showAgent', state.showAgent); syncControls(); render(); });
 
 const notifyBtn = document.getElementById('notify');
@@ -645,9 +796,9 @@ function syncControls() {
   document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', b.classList.contains('on')));
   showSub.checked = state.showSub;
   showIdle.checked = state.showIdle;
+  soundBox.checked = state.sound;
   showAgent.checked = state.showAgent;
   document.getElementById('agentBadgeToggle').style.display = state.view === 'office' ? '' : 'none';
-  document.getElementById('agentLegend').hidden = !state.showAgent;
   popout?.sync(PIP, state.view);
   if (!window.Notification) notifyBtn.style.display = 'none';
   else if (Notification.permission === 'granted') { notifyBtn.textContent = L.notifyOn; notifyBtn.disabled = true; }
@@ -684,7 +835,7 @@ const officeOpts = {
   compact: PIP,
   screenLabels: true,
   onFrame: (renderer) => popout?.drawPreview(renderer),
-  label: (s) => (s.role === 'leader' ? '★ ' : '') + (s.displayName || s.paneId || s.project || AGENT_NAME[s.agent] || s.agent),
+  label: (s) => (s.role === 'leader' ? '★ ' : '') + (s.displayName || s.paneId || (s.agent === 'omp' && s.subagent && s.title) || s.project || AGENT_NAME[s.agent] || s.agent),
   onHover(s, at, click) {
     if (click) {
       if (!s) return hideTip();
@@ -877,8 +1028,7 @@ langSel.addEventListener('change', () => {
   applyLang(chooseLang(state.data.lang));
   render();
 });
-document.getElementById('agentLegend').innerHTML = Object.entries(OFFICE_AGENT_BADGES)
-  .map(([key, a]) => `<span>${agentLogo(key)}${a.label}</span>`).join('');
+for (const agent of ['claude', 'codex', 'gemini', 'copilot', 'omp']) addAgentFilter(agent);
 popout = new OfficePopout({
   preferences: () => ({ ...Object.fromEntries(Object.keys(PREF_DEFAULTS).map((k) => [k, state[k]])), lang: store.get('lang', 'auto') }),
   office: () => office,

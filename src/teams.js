@@ -6,10 +6,13 @@ const { Watcher } = require('./watcher');
 
 // Herdr owns identity and topology. The unchanged Watcher/parsers own activity.
 // Never infer a binding from cwd, name, terminal title, or fuzzy ID matching.
+const activitySource = session => session.source === 'magpie' ? 'magpie' : 'log';
 function joinSessions(members, logs) {
   const index = new Map();
   for (const log of logs) {
-    for (const id of new Set([log.id, log.sessionId].filter(Boolean))) {
+    // Kimi children carry their parent's session ID for resume, not identity.
+    const alias = log.agent === 'kimi' && log.parentId ? null : log.sessionId;
+    for (const id of new Set([log.id, alias].filter(Boolean))) {
       const key = `${log.agent}:${id}`;
       if (!index.has(key)) index.set(key, []);
       index.get(key).push(log);
@@ -31,13 +34,14 @@ function joinSessions(members, logs) {
       ...log, key: member.key,
       displayName: member.displayName, teamId: member.teamId, workspaceId: member.workspaceId,
       paneId: member.paneId, tabId: member.tabId, role: member.role, presence: member.presence,
-      source: 'log', statusSource: 'log', herdrStatus: member.sourceStatus,
+      source: activitySource(log), statusSource: activitySource(log), herdrStatus: member.sourceStatus,
       logKey: `${log.agent}:${log.id}`, logSessionId: member.logSessionId,
-      binding: 'exact-session', capabilities: { resume: true },
+      binding: 'exact-session', capabilities: { resume: log.source !== 'magpie' },
     };
   });
   return joined.concat(logs.filter(log => !used.has(log)).map(log => ({
-    ...log, source: 'log', statusSource: 'log', teamId: 'ungrouped',
+    ...log, source: activitySource(log), statusSource: activitySource(log), teamId: 'ungrouped',
+    capabilities: { resume: log.source !== 'magpie' },
     displayName: `${log.agent}:${String(log.sessionId || log.id).slice(0, 8)}`,
     logKey: `${log.agent}:${log.id}`, logSessionId: log.sessionId || log.id,
     binding: 'unregistered-log',

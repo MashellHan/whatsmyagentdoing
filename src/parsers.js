@@ -37,6 +37,35 @@ function newSession(agent, id, file) {
   };
 }
 
+// Local calendar day, as a sortable YYYY-MM-DD key.
+function dayKey(ms) {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Today's turns and tokens, as far as the log records them. A large log read
+// head + tail only counts what was read.
+function today(s, ts) {
+  if (!ts) return null;
+  const day = dayKey(ts);
+  if (!s.daily || s.daily.day < day) s.daily = { day, turns: 0, tokens: 0 };
+  return s.daily.day === day ? s.daily : null;
+}
+
+function usage(s, ts, { context, window, tokens }) {
+  if (Number.isFinite(context) && context > 0) {
+    s.context = context;
+    s.contextWindow = Number.isFinite(window) && window > 0 ? window : null;
+  }
+  const d = Number.isFinite(tokens) && tokens > 0 && today(s, ts);
+  if (d) d.tokens += tokens;
+}
+
+function countTurn(s, ts) {
+  const d = today(s, ts);
+  if (d) d.turns += 1;
+}
+
 function clean(text, max = 220) {
   if (!text) return null;
   let t = String(text);
@@ -155,12 +184,22 @@ function applyClaude(s, d) {
         s.reply = null;
       }
       s.turnStartedAt = ts;
+      if (!isNotification && !d.isSidechain) countTurn(s, ts);
       set(s, 'thinking', null);
       return;
     }
     case 'assistant': {
       const m = d.message || {};
       if (m.model && m.model !== '<synthetic>') s.model = m.model;
+      // One API response is logged once per content block with the same usage.
+      const u = m.usage;
+      if (u && typeof u === 'object' && m.id !== s._usageId) {
+        s._usageId = m.id;
+        const n = (k) => (Number.isFinite(u[k]) ? u[k] : 0);
+        const prompt = n('input_tokens') + n('cache_creation_input_tokens') + n('cache_read_input_tokens');
+        usage(s, ts, { context: prompt + n('output_tokens'), window: prompt + n('output_tokens') > 200_000 ? 1_000_000 : 200_000,
+          tokens: n('input_tokens') + n('cache_creation_input_tokens') + n('output_tokens') });
+      }
       const blocks = Array.isArray(m.content) ? m.content : [];
       for (const b of blocks) {
         if (b.type === 'thinking' || b.type === 'redacted_thinking') set(s, 'thinking');
@@ -227,6 +266,8 @@ function applyCodex(s, d) {
     case 'event_msg':
       switch (p.type) {
         case 'task_started':
+          // Old and new log formats both start every turn with this event.
+          countTurn(s, ts);
           s.turnStartedAt = ts;
           s.reply = null;
           set(s, 'thinking', null);
@@ -246,6 +287,14 @@ function applyCodex(s, d) {
           s.prompt = clean(p.message);
           set(s, 'thinking', null);
           return;
+        case 'token_count': {
+          const last = p.info?.last_token_usage;
+          if (!last || typeof last !== 'object') return;
+          const n = (k) => (Number.isFinite(last[k]) ? last[k] : 0);
+          usage(s, ts, { context: n('input_tokens') + n('output_tokens'), window: p.info.model_context_window,
+            tokens: n('input_tokens') - n('cached_input_tokens') + n('output_tokens') });
+          return;
+        }
         case 'agent_message':
           s.reply = clean(p.message) || s.reply;
           set(s, 'typing', null);
@@ -362,6 +411,78 @@ function describeGeminiTool(tc) {
   }
 }
 
+function extractCopilotText(value, depth = 0) {
+  if (value == null || depth > 4) return '';
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map((v) => extractCopilotText(v, depth + 1)).join('\n');
+  if (typeof value === 'object') {
+    if (typeof value.text === 'string') return value.text;
+    if (typeof value.content === 'string') return value.content;
+    if (Array.isArray(value.content)) return extractCopilotText(value.content, depth + 1);
+    if (typeof value.message === 'string') return value.message;
+  }
+  return '';
+}
+
+function describeCopilotTool(tool, args = {}) {
+  const name = tool || 'tool';
+  if (args && typeof args === 'object') {
+    if (args.pattern) return `Search: ${short(args.pattern, 60)}`;
+    if (args.command) return `Shell: ${short(Array.isArray(args.command) ? args.command.join(' ') : String(args.command), 60)}`;
+    if (args.path || args.file_path) return `${name} ${path.basename(String(args.path || args.file_path || '')) || name}`;
+  }
+  return name;
+}
+
+function applyCopilot(s, d) {
+  if (!d || typeof d !== 'object') return;
+  const data = d.data || d;
+  if (d.timestamp) stamp(s, d.timestamp);
+  switch (d.type) {
+    case 'session.start': {
+      if (data.sessionId) s.sessionId = data.sessionId;
+      if (data.context?.cwd) s.cwd = data.context.cwd;
+      else if (data.context?.gitRoot) s.cwd = data.context.gitRoot;
+      if (data.selectedModel) s.model = data.selectedModel;
+      if (data.startTime) stamp(s, data.startTime);
+      return;
+    }
+    case 'user.message': {
+      const text = clean(extractCopilotText(data.content ?? data.transformedContent ?? data.prompt));
+      if (text) s.prompt = text;
+      s.turnStartedAt = d.timestamp ? Date.parse(d.timestamp) : s.turnStartedAt;
+      set(s, 'thinking', null);
+      return;
+    }
+    case 'assistant.message': {
+      const text = clean(extractCopilotText(data.content ?? data.message));
+      if (text) s.reply = text;
+      if (data.model) s.model = data.model;
+      set(s, 'typing', null);
+      return;
+    }
+    case 'tool.execution_start': {
+      const name = data.toolName || data.tool_name || 'tool';
+      set(s, 'tool', describeCopilotTool(name, data.arguments || data.args || {}));
+      return;
+    }
+    case 'tool.execution_complete': {
+      if (data.model) s.model = data.model;
+      set(s, 'thinking', null);
+      return;
+    }
+    case 'tool.execution_error':
+      set(s, 'error', null);
+      s.error = short(data.message || 'Tool error', 120);
+      return;
+    case 'session.end':
+      set(s, 'done', null);
+      return;
+    default:
+      return;
+  }
+}
+
 function applyGemini(s, d) {
   if (!d || typeof d !== 'object') return;
   // metadata line / $set updates
@@ -419,4 +540,108 @@ function applyGeminiDocument(s, doc) {
   applyGemini(s, { $set: doc });
 }
 
-module.exports = { newSession, applyClaude, applyCodex, applyGemini, applyGeminiDocument, clean };
+// ----------------------------------------------------------------------- OMP
+// Pending calls live outside the session object: kept out of the JSON API, freed with the session.
+const ompState = new WeakMap();
+function ompPending(s) {
+  let state = ompState.get(s);
+  if (!state) { state = { pending: new Map() }; ompState.set(s, state); }
+  return state.pending;
+}
+
+function describeOMPTool(name, args = {}) {
+  if (name === 'ask') return 'Waiting for your answer';
+  const file = args.path || args.file_path;
+  if (name === 'bash') return `bash: ${short(args.command || args.description)}`;
+  if (['read', 'edit', 'write', 'notebook'].includes(name)) return `${name} ${short(file || '')}`.trim();
+  if (args.pattern || args.query) return `${name}: ${short(args.pattern || args.query, 60)}`;
+  return short(name || 'tool');
+}
+
+function ompToolStatus(s) {
+  const calls = Array.from(ompPending(s).values());
+  const waiting = calls.find(c => c.name === 'ask');
+  const current = waiting || calls[calls.length - 1];
+  set(s, waiting ? 'waiting' : current ? 'tool' : 'thinking', current ? current.description : null);
+}
+
+function applyOMP(s, d) {
+  if (!d || typeof d !== 'object') return;
+  const pending = ompPending(s);
+  if (d.type === 'title') {
+    // The slot holds the current name; the watcher re-applies it after every read.
+    if (typeof d.title === 'string') s.title = clean(d.title, 120);
+    return;
+  }
+  if (d.type === 'session') {
+    if (typeof d.id === 'string' && d.id) s.id = s.sessionId = d.id;
+    if (typeof d.cwd === 'string') s.cwd = d.cwd;
+    if (!s.title && d.title) s.title = clean(d.title, 120);
+    if (d.parentSession) s.parentSession = d.parentSession; // lineage only, not a subagent
+    stamp(s, d.timestamp);
+    return;
+  }
+  if (d.type === 'title_change') {
+    if (typeof d.title === 'string') s.title = clean(d.title, 120);
+    return;
+  }
+  if (d.type === 'model_change') {
+    if ((!d.role || d.role === 'default') && d.model) s.model = d.model;
+    return;
+  }
+  if (d.type === 'custom') {
+    const data = d.data || {};
+    if (d.customType === 'tool_execution_start' && data.toolCallId && data.toolName) {
+      stamp(s, d.timestamp || data.startedAt);
+      const previous = pending.get(data.toolCallId);
+      pending.set(data.toolCallId, previous || { name: data.toolName, description: describeOMPTool(data.toolName, data.args) });
+      ompToolStatus(s);
+    } else if (d.customType === 'session_exit') {
+      stamp(s, d.timestamp || data.recordedAt);
+      if (data.kind === 'fatal') {
+        pending.clear(); set(s, 'error', null); s.error = short(data.reason || 'OMP exited with an error', 120);
+      } else if ((data.kind && data.kind !== 'normal') || pending.size || data.pendingToolCalls?.length) {
+        pending.clear(); set(s, 'interrupted', null);
+      } else if (['thinking', 'typing', 'tool', 'waiting'].includes(s.status)) set(s, 'idle', null);
+    }
+    return;
+  }
+  if (d.type !== 'message' || !d.message) return;
+  const m = d.message;
+  if (!['user', 'assistant', 'toolResult'].includes(m.role)) return;
+  const ts = stamp(s, d.timestamp || (typeof m.timestamp === 'number' ? new Date(m.timestamp).toISOString() : m.timestamp));
+  if (m.role === 'user') {
+    if (!m.steering) pending.clear();
+    s.prompt = clean(codexText(m.content));
+    s.reply = null;
+    s.turnStartedAt = ts;
+    set(s, 'thinking', null);
+    return;
+  }
+  if (m.role === 'toolResult') {
+    pending.delete(m.toolCallId);
+    ompToolStatus(s);
+    if (m.isError && !pending.size) {
+      set(s, 'error', null); s.error = clean(codexText(m.content), 120) || 'Tool error';
+    }
+    return;
+  }
+  if (m.model) s.model = m.provider && !m.model.startsWith(m.provider + '/') ? `${m.provider}/${m.model}` : m.model;
+  const blocks = Array.isArray(m.content) ? m.content : [];
+  const text = clean(codexText(m.content));
+  if (text) s.reply = text;
+  if (m.stopReason === 'error' || m.stopReason === 'aborted') {
+    pending.clear();
+    set(s, m.stopReason === 'error' ? 'error' : 'interrupted', null);
+    if (m.stopReason === 'error') s.error = short(m.errorMessage || text || 'OMP error', 120);
+    return;
+  }
+  for (const b of blocks) {
+    if (b.type === 'toolCall' && b.id && b.name) pending.set(b.id, { name: b.name, description: describeOMPTool(b.name, b.arguments) });
+  }
+  if (pending.size) ompToolStatus(s);
+  else if (m.stopReason === 'stop' || m.stopReason === 'length') set(s, 'done', null);
+  else set(s, 'thinking', null);
+}
+
+module.exports = { dayKey, newSession, applyClaude, applyCodex, applyGemini, applyGeminiDocument, applyCopilot, applyOMP, clean };

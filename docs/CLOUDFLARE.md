@@ -17,6 +17,11 @@ Only team id/name, member display name, agent type, status fields and timestamps
 titles, errors, activity, cwd/project, model, pane/session ids and team guidelines (AGENTS.md / TEAMS.md)
 are never sent. Member keys are SHA-256 hashed on mini-1.
 
+The v0.4.0 integration also recognizes Copilot CLI, OMP, Kimi Code, DSH and Grok
+Build, with explicit log/Herdr/Magpie provenance. Today totals, context usage,
+OMP profiles and resume commands are still excluded. Bundled provider SVGs are
+included in the asset build and use the same Access protection as other assets.
+
 ## Offline rule
 
 mini-1 pushes on change and a full-snapshot heartbeat every 20 s. The viewer shows **mini-1 离线** when the
@@ -34,6 +39,13 @@ npx wrangler@4 deploy --config cloudflare/wrangler.viewer.jsonc
 
 For a UI-only update, rebuild the assets and deploy the viewer; the ingest Worker and its secret can
 stay in place. The local push config's `token` must match the ingest Worker's `PUSH_TOKEN`.
+
+When updating the shared whitelist, deploy the ingest Worker before the viewer,
+then restart the existing local push service so both ends use the same projection.
+If collector code changed, update the installed myoffice runtime and restart its
+exact port with the existing Herdr session and local team map. Preserve the local
+configuration when refreshing a copied skill installation. Verify local source
+freshness, the authenticated `/ingest/check` response and the viewer deployment.
 
 Protect `agent-town.mxhan.workers.dev` with a hostname-based Cloudflare Access application and an
 Allow policy for the exact `ALLOWED_VIEWER_EMAIL`. In the Worker dashboard, this is configured from
