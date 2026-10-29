@@ -15,9 +15,13 @@ const SECURITY = {
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...SECURITY } });
 const town = (env) => env.TOWN.get(env.TOWN.idFromName('mini-1'));
 
-function harden(response) {
+function harden(response, { allowSameOriginFrame = false } = {}) {
   const out = new Response(response.body, response);
   for (const [k, v] of Object.entries(SECURITY)) out.headers.set(k, v);
+  if (allowSameOriginFrame) {
+    out.headers.set('x-frame-options', 'SAMEORIGIN');
+    out.headers.set('content-security-policy', "frame-ancestors 'self'");
+  }
   return out;
 }
 
@@ -48,10 +52,12 @@ export default {
     if (page) {
       const res = await env.ASSETS.fetch(new URL(page, url));
       if (!res.ok) return harden(res);
+      // Document PiP embeds the compact office in a same-origin iframe.
+      const allowSameOriginFrame = page === '/index.html' && url.searchParams.get('pip') === '1';
       // Classic script before any page script, so it can provide /events.
       return harden(new HTMLRewriter()
         .on('head', { element(el) { el.prepend('<script src="/remote-shim.js"></script>', { html: true }); } })
-        .transform(res));
+        .transform(res), { allowSameOriginFrame });
     }
     if (FILES.has(url.pathname) || ASSET.test(url.pathname)) return harden(await env.ASSETS.fetch(request));
     return new Response('Not found', { status: 404, headers: SECURITY });

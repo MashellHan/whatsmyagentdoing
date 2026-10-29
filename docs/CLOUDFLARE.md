@@ -27,6 +27,19 @@ included in the asset build and use the same Access protection as other assets.
 mini-1 pushes on change and a full-snapshot heartbeat every 20 s. The viewer shows **mini-1 离线** when the
 last push is older than 60 s (age computed from server time, not the phone clock).
 
+## Picture-in-picture
+
+The popup embeds `/office?pip=1` in a same-origin iframe. Applying `X-Frame-Options: DENY`
+to that page made the online popup blank. Only authenticated compact office pages
+(`/office` or `/office/` with `pip=1`) use `X-Frame-Options: SAMEORIGIN` and
+`Content-Security-Policy: frame-ancestors 'self'`. Other pages keep `DENY`; Access
+authentication and WebSocket origin checks still apply.
+
+Run `npm run test:cloud-ui` with Playwright Chromium installed, or set
+`WMAD_BROWSER_EXECUTABLE` to a Chromium browser. It exercises the viewer Worker
+with synthetic Access credentials and real browser framing rules, including live
+updates, 2D/3D rendering, closing the popup and rejecting another origin's iframe.
+
 ## Deploy
 
 ```sh
