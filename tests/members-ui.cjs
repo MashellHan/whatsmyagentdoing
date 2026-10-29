@@ -65,7 +65,6 @@ const defer = () => { let resolve; const promise = new Promise(r => { resolve = 
     await a.locator('.member-summary').click();
     await page.waitForFunction(() => document.querySelectorAll('.member-command').length === 30);
     assert.equal(await a.locator('.member-summary').getAttribute('aria-expanded'), 'true');
-    assert.ok((await a.locator('.member-command').last().innerText()).includes('内容已截断'));
     assert.equal(await page.locator('.member-activity img,.member-activity script').count(), 0);
     assert.equal(await page.evaluate(() => window.memberXss), undefined);
     assert.equal(await a.locator('.member-command pre').last().evaluate(n => Array.from(n.textContent).length), 360);
@@ -123,8 +122,9 @@ const defer = () => { let resolve; const promise = new Promise(r => { resolve = 
     await page.waitForSelector('.member-command');
     await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, value: true }); document.dispatchEvent(new Event('visibilitychange')); });
     const hiddenStopped = calls.length; await page.waitForTimeout(1700); assert.equal(calls.length, hiddenStopped);
+    command('b', 'after-hidden', 'ACTIVITY_AFTER_VISIBILITY_RESUME');
     await page.evaluate(() => { delete document.hidden; document.dispatchEvent(new Event('visibilitychange')); });
-    await page.waitForFunction(() => document.querySelector('.member-activity-status').textContent.startsWith('实时'));
+    await page.waitForFunction(() => document.querySelector('.member-commands').textContent.includes('ACTIVITY_AFTER_VISIBILITY_RESUME'));
     for (const [width, height] of [[1280, 720], [1024, 768], [390, 844], [320, 568]]) {
       await page.setViewportSize({ width, height });
       await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));

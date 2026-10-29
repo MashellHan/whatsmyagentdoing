@@ -31,7 +31,6 @@ export function mountMemberUI({ team, rules }) {
   }
   function content(data) {
     const signature = JSON.stringify([data.available, data.reason, data.entries]);
-    active.status.textContent = data.available ? `实时 · ${data.entries.length} 条` : '尚未关联';
     if (active.signature === signature) return;
     active.signature = signature;
     const scroll = active.list.scrollTop;
@@ -39,7 +38,7 @@ export function mountMemberUI({ team, rules }) {
     active.list.replaceChildren();
     if (!data.available) {
       active.list.append(node('li', 'member-activity-note', REASONS[data.reason] || '此成员的最近活动暂不可用。'));
-      active.status.textContent = '尚未关联'; return;
+      return;
     }
     if (!data.entries.length) active.list.append(node('li', 'member-activity-note', '暂无活动记录。'));
     for (const entry of data.entries) {
@@ -51,10 +50,8 @@ export function mountMemberUI({ team, rules }) {
       heading.append(node('span', '', entry.tool), time);
       const code = node('pre', '', entry.text);
       row.append(heading, code);
-      if (entry.truncated) row.append(node('span', 'member-truncated', '内容已截断'));
       active.list.append(row);
     }
-    active.status.textContent = `实时 · ${data.entries.length} 条`;
     // Stay at the newest command unless the user has scrolled back to read.
     active.list.scrollTop = atBottom || !active.loaded ? active.list.scrollHeight : scroll;
     active.loaded = true;
@@ -78,7 +75,6 @@ export function mountMemberUI({ team, rules }) {
       if (version !== generation || active?.key !== key || !canPoll()) return;
       active.signature = null;
       active.list.replaceChildren(node('li', 'member-activity-note', error.name === 'AbortError' ? '读取超时，正在重试…' : '最近活动暂不可用，正在重试…'));
-      active.status.textContent = '重连中';
     } finally {
       clearTimeout(deadline);
       if (version === generation) { controller = null; if (canPoll()) timer = setTimeout(poll, INTERVAL); }
@@ -88,15 +84,14 @@ export function mountMemberUI({ team, rules }) {
     close();
     const panel = node('section', 'member-activity'); panel.id = `member-activity-${++sequence}`;
     panel.setAttribute('aria-label', `${member.displayName || member.id} 的最近活动`);
-    const heading = node('div', 'member-activity-heading'), status = node('span', 'member-activity-status', '连接中');
-    status.setAttribute('role', 'status');
-    heading.append(node('strong', '', '最近活动'), status);
+    const heading = node('div', 'member-activity-heading');
+    heading.append(node('strong', '', '最近活动'));
     const list = node('ol', 'member-commands'); list.tabIndex = 0; list.setAttribute('aria-label', '最近活动记录');
     list.append(node('li', 'member-activity-note', '正在读取…'));
-    panel.append(heading, list, node('p', 'member-activity-foot', '每 1.5 秒刷新 · 最多 30 条 · 每条最多 360 字'));
+    panel.append(heading, list);
     row.append(panel);
     const toggle = row.querySelector('.member-summary'); toggle.setAttribute('aria-expanded', 'true'); toggle.setAttribute('aria-controls', panel.id);
-    active = { key: member.key, row, panel, status, list, signature: null, loaded: false };
+    active = { key: member.key, row, panel, list, signature: null, loaded: false };
     void poll();
   }
   roster.addEventListener('click', event => {
@@ -112,7 +107,6 @@ export function mountMemberUI({ team, rules }) {
   function visibility() {
     cancel();
     if (canPoll()) void poll();
-    else if (active) active.status.textContent = '已暂停';
   }
   document.addEventListener('visibilitychange', visibility);
   window.addEventListener('rules-visibility', visibility);
