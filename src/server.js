@@ -10,6 +10,7 @@ const STATIC = {
   '/': ['town.html', 'text/html; charset=utf-8'],
   '/town': ['town.html', 'text/html; charset=utf-8'],
   '/town.js': ['town.js', 'text/javascript; charset=utf-8'],
+  '/quota.js': ['quota.js', 'text/javascript; charset=utf-8'],
   '/town.css': ['town.css', 'text/css; charset=utf-8'],
   '/team-office.css': ['team-office.css', 'text/css; charset=utf-8'],
   '/rules-ui.js': ['rules-ui.js', 'text/javascript; charset=utf-8'],
@@ -31,6 +32,7 @@ const updater = require('./update');
 const { RulesReader } = require('./rules');
 const { ompResumeCommand } = require('./omp');
 const { dayKey } = require('./parsers');
+const { sanitizeQuotaSnapshot } = require('./quota-schema');
 const { sanitizeUsage } = require('./usage-schema');
 
 function serveFile(res, root, rel) {
@@ -156,12 +158,13 @@ function snapshot(watcher, opts = {}) {
     privacy: opts.privacy !== false, source: watcher.sourceInfo?.() || { kind: opts.demo ? 'demo' : 'logs', presence: 'fresh' } };
 }
 
-function createServer(watcher, opts = {}, { onShutdown, rulesReader, usageMonitor } = {}) {
+function createServer(watcher, opts = {}, { onShutdown, rulesReader, quotaMonitor, usageMonitor } = {}) {
   const rules = rulesReader || (typeof watcher.ruleContext === 'function' ? new RulesReader((team, member) => watcher.ruleContext(team, member)) : null);
   const clients = new Set();
   let last = '';
   const state = () => {
     const body = snapshot(watcher, opts);
+    if (quotaMonitor) body.quota = sanitizeQuotaSnapshot(quotaMonitor.snapshot());
     if (usageMonitor) body.usage = sanitizeUsage(usageMonitor.snapshot());
     return body;
   };
@@ -177,6 +180,7 @@ function createServer(watcher, opts = {}, { onShutdown, rulesReader, usageMonito
   };
   const onChange = () => push(false);
   watcher.on('change', onChange);
+  quotaMonitor?.on('change', onChange);
   usageMonitor?.on('change', onChange);
   // Status can flip with no new log lines (see view()), so re-check on a clock.
   const clock = setInterval(() => push(false), 5000);
@@ -194,7 +198,11 @@ function createServer(watcher, opts = {}, { onShutdown, rulesReader, usageMonito
     let url;
     try { url = new URL(req.url, 'http://localhost'); decodeURIComponent(url.pathname); }
     catch { res.writeHead(400).end(); return; }
-    if (url.pathname === '/api/rules' || url.pathname.startsWith('/api/rules/') || url.pathname.startsWith('/api/members/')) {
+    if (url.pathname === '/api/quota') {
+      res.writeHead(req.method === 'GET' ? 200 : 405, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', allow: 'GET' });
+      res.end(JSON.stringify(req.method === 'GET' ? { serverNow: Date.now(), quota: sanitizeQuotaSnapshot(quotaMonitor?.snapshot()) } : { error: 'method_not_allowed' }));
+      return;
+    } else if (url.pathname === '/api/rules' || url.pathname.startsWith('/api/rules/') || url.pathname.startsWith('/api/members/')) {
       // Local rule files have a stricter boundary than ordinary status data.
       // The custom header is a cross-origin preflight guard, not authentication.
       const origin = `http://${req.headers.host}`;
@@ -291,9 +299,10 @@ function createServer(watcher, opts = {}, { onShutdown, rulesReader, usageMonito
       res.writeHead(404).end();
     }
   });
-  server.once('listening', () => usageMonitor?.start());
+  server.once('listening', () => { quotaMonitor?.start(); usageMonitor?.start(); });
   server.on('close', () => {
     clearInterval(clock); clearInterval(heartbeat); watcher.off('change', onChange);
+    quotaMonitor?.off('change', onChange); quotaMonitor?.stop();
     usageMonitor?.off('change', onChange); usageMonitor?.stop();
   });
   return server;

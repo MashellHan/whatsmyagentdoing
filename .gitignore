@@ -5,3 +5,4 @@ dist/
 packs/
 cloudflare/dist/
 cloudflare/.wrangler/
+.local/

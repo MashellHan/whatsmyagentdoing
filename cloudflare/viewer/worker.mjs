@@ -4,7 +4,7 @@
 import { verifyAccessJwt } from './access.mjs';
 
 const PAGES = { '/': '/town.html', '/town': '/town.html', '/office': '/index.html', '/office/': '/index.html' };
-const FILES = new Set(['/town.js', '/town.css', '/team-office.css', '/office.js', '/office3d.js', '/i18n.js', '/popout.js', '/remote-shim.js']);
+const FILES = new Set(['/town.js', '/quota.js', '/town.css', '/team-office.css', '/office.js', '/office3d.js', '/i18n.js', '/popout.js', '/remote-shim.js']);
 const ASSET = /^\/assets\/[A-Za-z0-9_\/.-]+\.(png|svg|glb|json)$/;
 const SECURITY = {
   'cache-control': 'no-store',
@@ -43,6 +43,10 @@ export default {
     if (url.pathname === '/api/sessions') {
       const state = await (await town(env).fetch('https://town/state')).json();
       return json(200, state.snapshot || { now: Date.now(), sessions: [], teams: [], privacy: true, source: { kind: 'remote', presence: 'stale', error: '等待 mini-1 推送' } });
+    }
+    if (url.pathname === '/api/quota' || url.pathname === '/api/quota/history') {
+      const state = await (await town(env).fetch(`https://town${url.pathname.slice(4)}`)).json();
+      return json(200, state);
     }
     if (url.pathname === '/api/scenes') return json(200, { installed: [], available: [] });
     if (url.pathname === '/api/version') return json(200, { version: 'remote', latest: null, updateAvailable: false, canUpdate: false, disabled: true });

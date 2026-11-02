@@ -65,6 +65,12 @@ In list view, sessions are grouped into **Needs you → Working → Finished**, 
 
 **Today:** the legacy Today panel adds up today's turns and uncached tokens by agent and by project, from Claude Code and Codex usage records since local midnight. Each card also shows how full the model's context window is (amber from 60%, red from 85%). Very large logs are read head + tail, so these legacy counts can be low.
 
+**Copilot account quota (optional):** below the town, the homepage can show selected GitHub
+accounts' premium usage and remaining allowance. A local collector polls every hour using verified
+keyring credentials; the Cloudflare viewer receives quota statistics and retains
+bounded history. It requires explicit local configuration and is separate from
+per-session token usage. See [setup, privacy and freshness](docs/CLOUDFLARE.md#copilot-account-quota).
+
 **Agent badges:** in both 2D and 3D, each provider's logo identifies its agents beside their names, including subagents. The same icons appear in the legend, list cards and filters. Open **Settings → Agent badges** to hide the office markers and legend; your choice is saved. Icons are bundled locally, with initials as a fallback if an image cannot load. See [icon sources and attribution](assets/agents/README.md).
 
 The toolbar keeps the view, 2D/3D and pop-out controls visible. Scene selection, agent filters, display options, notifications and language are grouped under **Settings**.
@@ -197,7 +203,10 @@ waits for one poll from each source and exits with an error if any fails.
 The web keys and sign-in cookies stay on the server and are never sent to the
 dashboard's browser.
 
-**Privacy:** nothing leaves your machine. The server binds to `127.0.0.1` only and rejects requests that aren't addressed to localhost. No runtime dependencies — read `src/` in five minutes. (`web/office3d.js` is the 3D source; `npm run build` bundles it with three.js into `public/office3d.js`.)
+**Privacy:** the default dashboard stays local. Optional account quota monitoring
+reads GitHub's account API; the separately configured Cloudflare push sends only
+its documented whitelist. The server binds to `127.0.0.1` only and rejects requests
+that aren't addressed to localhost. No runtime dependencies — read `src/` in five minutes. (`web/office3d.js` is the 3D source; `npm run build` bundles it with three.js into `public/office3d.js`.)
 
 ## Limits
 

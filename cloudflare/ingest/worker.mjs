@@ -1,8 +1,10 @@
 // agent-town-ingest: the only writer. mini-1 POSTs whitelisted snapshots with
 // a bearer token; the TownState Durable Object keeps ONLY the latest snapshot
-// in memory (no storage writes) and fans it out over hibernatable WebSockets.
+// in memory and fans it out over hibernatable WebSockets. Account quota
+// snapshots alone are persisted, with a bounded 90-day history.
 // Viewers never reach this hostname; the viewer Worker binds the DO directly.
 import { sanitizeSnapshot, signature } from '../shared/whitelist.mjs';
+import { LATEST_KEY, saveQuota, readQuotaHistory } from '../shared/quota-store.mjs';
 
 const MAX_BODY = 256 * 1024;
 const enc = new TextEncoder();
@@ -46,6 +48,8 @@ export class TownState {
     this.snapshot = null; // memory only; lost on eviction until the next push (<=20s)
     this.sig = '';
     this.lastPushAt = 0;
+    this.quota = null;
+    this.ready = ctx.storage.get(LATEST_KEY).then(value => { this.quota = value || null; });
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
   }
   message(type) {
@@ -57,9 +61,14 @@ export class TownState {
     }
   }
   async fetch(request) {
+    await this.ready;
     const url = new URL(request.url);
     if (url.pathname === '/push' && request.method === 'POST') {
       const snapshot = sanitizeSnapshot(await request.json(), {});
+      if (snapshot.quota?.capturedAt && (!this.quota || snapshot.quota.capturedAt > this.quota.capturedAt)) {
+        this.quota = await saveQuota(this.ctx.storage, snapshot.quota);
+      }
+      if (this.quota) snapshot.quota = this.quota;
       const sig = signature(snapshot);
       const changed = sig !== this.sig || !this.snapshot;
       this.snapshot = snapshot;
@@ -69,8 +78,10 @@ export class TownState {
       return reply(200, { ok: true, changed, teams: snapshot.teams.length, sessions: snapshot.sessions.length, viewers: this.ctx.getWebSockets().length });
     }
     if (url.pathname === '/state') {
-      return reply(200, { ok: true, lastPushAt: this.lastPushAt || null, viewers: this.ctx.getWebSockets().length, snapshot: this.snapshot });
+      return reply(200, { ok: true, lastPushAt: this.lastPushAt || null, viewers: this.ctx.getWebSockets().length, snapshot: this.snapshot, quota: this.quota });
     }
+    if (url.pathname === '/quota') return reply(200, { serverNow: Date.now(), quota: this.quota });
+    if (url.pathname === '/quota/history') return reply(200, { serverNow: Date.now(), history: await readQuotaHistory(this.ctx.storage) });
     if (url.pathname === '/ws') {
       if (request.headers.get('upgrade') !== 'websocket') return reply(426, { ok: false });
       const pair = new WebSocketPair();

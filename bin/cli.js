@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
-// This local team dashboard never phones home or updates the checkout.
+// Self-updates stay disabled. Optional configured quota monitoring reads GitHub
+// account APIs; its credentials remain in the local system keyring.
 process.env.WMAD_NO_UPDATE_CHECK = '1';
 
 const http = require('http');
@@ -16,6 +17,7 @@ const scenes = require('../src/scenes');
 const updater = require('../src/update');
 const hook = require('../src/hook');
 const { createServer, snapshot } = require('../src/server');
+const { configuredQuotaMonitor } = require('../src/quota');
 const { UsageMonitor } = require('../src/token-usage');
 const pkg = require('../package.json');
 
@@ -219,12 +221,18 @@ async function main() {
     return;
   }
 
+  let quotaMonitor = null;
+  if (!o.demo) {
+    try { quotaMonitor = configuredQuotaMonitor(); }
+    catch (error) { console.error(error.message); }
+  }
   watcher.start();
   const server = createServer(watcher, o, {
+    quotaMonitor,
     usageMonitor: o.demo ? null : new UsageMonitor({ ompDir: o.ompDir }),
-    onShutdown: () => { watcher.stop(); server.close(); process.exit(0); },
+    onShutdown: () => { quotaMonitor?.stop(); watcher.stop(); server.close(); process.exit(0); },
   });
-  const shutdown = () => { watcher.stop(); server.closeAllConnections?.(); server.close(() => process.exit(0)); };
+  const shutdown = () => { quotaMonitor?.stop(); watcher.stop(); server.closeAllConnections?.(); server.close(() => process.exit(0)); };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 

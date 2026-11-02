@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out = join(root, 'cloudflare', 'dist');
-const PUBLIC = ['town.html', 'index.html', 'town.js', 'town.css', 'team-office.css', 'office.js', 'office3d.js', 'i18n.js', 'popout.js'];
+const PUBLIC = ['town.html', 'index.html', 'town.js', 'quota.js', 'town.css', 'team-office.css', 'office.js', 'office3d.js', 'i18n.js', 'popout.js'];
 const ASSET_TYPES = new Set(['.png', '.svg', '.glb', '.json']);
 
 rmSync(out, { recursive: true, force: true });

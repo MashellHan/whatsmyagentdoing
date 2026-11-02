@@ -74,6 +74,7 @@ test('authenticated remote assets include new provider SVGs while local rules re
   execFileSync(process.execPath, [path.join(__dirname, '../cloudflare/build.mjs')]);
   const requested = [];
   const env = { VIEWER_HOST: 'fixture.example.test', ACCESS_TEAM_URL: team, ACCESS_AUD: 'fixture-aud', ALLOWED_VIEWER_EMAIL: 'fixture@example.test',
+    TOWN: { idFromName: () => 'fixture', get: () => ({ fetch: async url => Response.json(url.endsWith('/history') ? { serverNow: 1, history: [] } : { serverNow: 1, quota: null }) }) },
     ASSETS: { fetch: async request => { const asset = new URL(request.url || request).pathname; requested.push(asset); return new Response(fs.readFileSync(path.join(__dirname, '../cloudflare/dist', asset)), { headers: { 'content-type': 'image/svg+xml' } }); } } };
   const request = (asset, authenticated = true) => worker.fetch(new Request(`https://${env.VIEWER_HOST}${asset}`, {
     headers: authenticated ? { 'cf-access-jwt-assertion': token } : {},
@@ -88,6 +89,14 @@ test('authenticated remote assets include new provider SVGs while local rules re
   }
   for (const asset of ['/rules-ui.js', '/api/rules', '/member-ui.js', '/member-ui.css', '/api/members/activity', '/assets/agents/README.md']) assert.equal((await request(asset)).status, 404);
   assert.equal(requested.length, 5, 'only authenticated, allowed assets reach the asset binding');
+  for (const api of ['/api/quota', '/api/quota/history']) {
+    const response = await request(api);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.equal((await request(api, false)).status, 403, 'quota and history require Access');
+  }
+  assert.equal((await request('/quota.js')).status, 200);
+  assert.equal((await request('/quota.js', false)).status, 403);
 });
 
 test('viewer shows mini-1 offline after 60s without a push', async () => {

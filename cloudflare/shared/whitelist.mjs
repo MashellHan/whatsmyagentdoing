@@ -2,9 +2,12 @@
 // push agent and the ingest Worker: anything not listed here is dropped.
 // Allowed: team name, member name, agent type, status, timestamps.
 // Optional token usage: aggregate counters, dates, timezone and provider names.
+// Optional account quota: confirmed login/host, plan, numeric counters and
+// collection times. The independent quota whitelist drops all credentials.
 // Never: prompts, replies, titles, errors, activity, cwd/project, model,
 // session/pane ids, team guidelines (AGENTS.md / TEAMS.md) or any free text.
-
+import quotaSchema from '../../src/quota-schema.js';
+const { sanitizeQuotaSnapshot } = quotaSchema;
 import usageSchema from '../../src/usage-schema.js';
 const { sanitizeUsage } = usageSchema;
 
@@ -64,6 +67,7 @@ export function sanitizeSnapshot(input, { sourceOk = true } = {}) {
     teams,
     sessions,
     source: { kind: 'remote', presence: stale ? 'stale' : 'fresh', error: stale ? 'mini-1 本地状态暂不可读，显示上次快照。' : null },
+    ...(raw.quota ? { quota: sanitizeQuotaSnapshot(raw.quota) } : {}),
     ...(raw.usage ? { usage: sanitizeUsage(raw.usage) } : {}),
   };
 }
