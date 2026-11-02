@@ -69,9 +69,20 @@ class TeamWatcher extends EventEmitter {
     this.logs.off('change', this.changed); this.herdr.off('change', this.changed);
   }
   async tick() { this.logs.tick(); await this.herdr.tick(); }
-  sessions() { return joinSessions(this.herdr.sessions(), this.logs.sessions()); }
+  hiddenTeamIds() {
+    return new Set(this.herdr.teams().filter(team => {
+      const config = this.herdr.teamMap?.workspaces?.[team.id];
+      return config?.hidden === true && config.expectedLabel === team.name;
+    }).map(team => team.id));
+  }
+  sessions() {
+    const hidden = this.hiddenTeamIds();
+    // Join first so a hidden team's bound logs cannot reappear in the commons.
+    return joinSessions(this.herdr.sessions(), this.logs.sessions()).filter(session => !hidden.has(session.teamId));
+  }
   teams() {
-    const teams = [...this.herdr.teams()];
+    const hidden = this.hiddenTeamIds();
+    const teams = this.herdr.teams().filter(team => !hidden.has(team.id));
     if (this.sessions().some(s => s.teamId === 'ungrouped')) teams.push({
       id: 'ungrouped', name: '未分组', label: '未分组', presence: 'fresh',
     });

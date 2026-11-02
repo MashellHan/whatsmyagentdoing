@@ -97,3 +97,16 @@ test('composed lifecycle forwards both sources and retains empty houses plus ung
   assert.equal(snapshot(w).source.statusPolicy, 'log-first-exact-session');
   w.stop(); logs.emit('change'); assert.equal(changes, 2); assert.ok(herdr.stopped && logs.stopped);
 });
+
+test('hiding a named team keeps its bound logs out of the commons and preserves history', () => {
+  const herdr = { teamMap: { workspaces: { w1: { hidden: true, expectedLabel: 'team' } } },
+    teams: () => [{ id: 'w1', name: 'team' }, { id: 'w2', name: 'other' }], sessions: () => [member()] };
+  const history = [log(), log({ id: 'independent' })];
+  const watcher = new TeamWatcher({ herdr, logs: { sessions: () => history } });
+  assert.deepEqual(watcher.teams().map(team => team.id), ['w2', 'ungrouped']);
+  assert.deepEqual(watcher.sessions().map(session => session.id), ['independent']);
+  assert.equal(history.length, 2, 'hiding does not delete session history');
+  herdr.teams = () => [{ id: 'w1', name: 'replacement' }];
+  assert.equal(watcher.teams()[0].id, 'w1', 'a reused workspace ID is not hidden');
+  assert.equal(watcher.sessions()[0].teamId, 'w1');
+});

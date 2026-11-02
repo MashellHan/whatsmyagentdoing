@@ -1,5 +1,7 @@
 {
   "scope": "current-herdr-session",
-  "workspaces": {},
+  "workspaces": {
+    "w1": { "hidden": true, "expectedLabel": "team" }
+  },
   "members": {}
 }
