@@ -4,6 +4,10 @@ const { EventEmitter } = require('node:events');
 const { chromium } = require('playwright');
 const { createServer } = require('../src/server');
 const source = new EventEmitter();
+const usageMonitor = new EventEmitter();
+let usage = { status: 'ready', updatedAt: Date.now(), timeZone: 'Asia/Shanghai', day: '2026-11-02', month: '2026-11',
+  agents: ['codex', 'copilot'], todayTokens: 1_250_000, monthTokens: 8_000_000, weekTokens: 6_000_000, previousWeekTokens: 5_000_000 };
+Object.assign(usageMonitor, { snapshot: () => usage, start() {}, stop() {} });
 const member = (teamId, status, i) => ({
   id: `${teamId}-${i}`, key: `${teamId}-${i}`, teamId, agent: 'codex',
   source: status === 'unknown' ? 'herdr' : 'log', statusSource: status === 'unknown' ? 'herdr' : 'log',
@@ -29,6 +33,7 @@ async function layoutCheck(page, width) {
     const gap = (a,b) => Math.max(b.top-a.bottom, a.top-b.bottom, b.left-a.right, a.left-b.right);
     const box = el => el.getBoundingClientRect();
     if (document.documentElement.scrollWidth > innerWidth) issues.push('horizontal overflow');
+    for (const number of document.querySelectorAll('.token-stats dd')) if (number.scrollWidth > number.clientWidth + 1) issues.push('token number overflow');
     if (+document.querySelector('#neighborhood').dataset.rows !== Math.ceil(nodes.length/(mobile ? 1 : 2))) issues.push('actual rows');
     nodes.forEach((n, i) => {
       const b = box(n), sign = signs[i], stage = box(n.querySelector('.house-art-stage'));
@@ -69,7 +74,7 @@ async function layoutCheck(page, width) {
   assert.deepEqual(issues, [], `layout at ${width}`);
 }
 (async () => {
-  const server = createServer(source);
+  const server = createServer(source, {}, { usageMonitor });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   let browser;
   try {
@@ -88,6 +93,25 @@ async function layoutCheck(page, width) {
       window.EventSource = class extends Native { constructor(...args) { super(...args); window.fixtureEvents = this; } };
     });
     await page.goto(base); await page.waitForSelector('[data-testid=house]'); await settle(page);
+    assert.equal(await page.locator('#tokens-today').innerText(), '1.25M');
+    assert.equal(await page.locator('#tokens-month').innerText(), '8M');
+    assert.equal(await page.locator('#tokens-week').innerText(), '6M');
+    assert.equal(await page.locator('#tokens-wow').innerText(), '+20%');
+    assert.match(await page.locator('#tokens-today').getAttribute('title'), /1,250,000/);
+    const tokenPlacement = await page.evaluate(() => {
+      const panel = document.getElementById('token-panel'), overview = document.querySelector('.overview');
+      return { insideIntro: !!panel.closest('.intro'), right: panel.getBoundingClientRect().right, teamLeft: overview.getBoundingClientRect().left,
+        tokenSize: parseFloat(getComputedStyle(document.getElementById('tokens-today')).fontSize), teamSize: parseFloat(getComputedStyle(document.getElementById('busy-team-count')).fontSize) };
+    });
+    assert.ok(tokenPlacement.insideIntro && tokenPlacement.right <= tokenPlacement.teamLeft, 'token usage stays to the left of the team summary');
+    assert.ok(tokenPlacement.tokenSize < tokenPlacement.teamSize, 'token usage stays visually secondary');
+    usage = { ...usage, previousWeekTokens: 0 }; usageMonitor.emit('change');
+    await page.waitForFunction(() => document.getElementById('tokens-wow').textContent === '新增');
+    usage = { ...usage, status: 'unavailable' }; usageMonitor.emit('change');
+    await page.waitForFunction(() => document.getElementById('tokens-today').textContent === '—');
+    assert.equal(await page.locator('#token-status').innerText(), '暂无用量记录');
+    usage = { ...usage, status: 'ready', previousWeekTokens: 5_000_000 }; usageMonitor.emit('change');
+    await page.waitForFunction(() => document.getElementById('tokens-wow').textContent === '+20%');
     await page.locator('#townLayout [data-layout=wide]').click(); await settle(page);
     const house = id => page.locator(`[data-team-id="${id}"]`);
     const emit = async () => { source.emit('change'); await settle(page); };

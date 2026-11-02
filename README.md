@@ -61,7 +61,9 @@ In list view, sessions are grouped into **Needs you → Working → Finished**, 
 
 **Alerts:** when an agent needs you (a question, an approval or an error), the page can send a browser notification and, with **Settings → Sound**, play a short chime. A tool that runs for more than 10 minutes, or thinking that goes silent for 8, is flagged as *No progress*, so a hung command or a lost prompt doesn't cost you an hour.
 
-**Today:** the Today panel adds up today's turns and tokens by agent and by project, from Claude Code and Codex usage records since local midnight. Each card also shows how full the model's context window is (amber from 60%, red from 85%). Very large logs are read head + tail, so their counts can be low.
+**Home token usage:** today's and this month's totals use the collector's local calendar; week over week compares the latest rolling seven days with the preceding seven days. Totals include input and output tokens, with cached input counted once. Full retained histories (including archived Codex logs) are streamed once, then read incrementally, independently of the activity window. Recorded Claude, Codex, Copilot, Gemini and OMP usage is supported; missing usage is not estimated. Only aggregate counters, dates, timezone and provider names reach the authenticated remote viewer.
+
+**Today:** the legacy Today panel adds up today's turns and uncached tokens by agent and by project, from Claude Code and Codex usage records since local midnight. Each card also shows how full the model's context window is (amber from 60%, red from 85%). Very large logs are read head + tail, so these legacy counts can be low.
 
 **Agent badges:** in both 2D and 3D, each provider's logo identifies its agents beside their names, including subagents. The same icons appear in the legend, list cards and filters. Open **Settings → Agent badges** to hide the office markers and legend; your choice is saved. Icons are bundled locally, with initials as a fallback if an image cannot load. See [icon sources and attribution](assets/agents/README.md).
 

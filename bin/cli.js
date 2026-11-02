@@ -16,6 +16,7 @@ const scenes = require('../src/scenes');
 const updater = require('../src/update');
 const hook = require('../src/hook');
 const { createServer, snapshot } = require('../src/server');
+const { UsageMonitor } = require('../src/token-usage');
 const pkg = require('../package.json');
 
 const HELP = `whatsmyagentdoing ${pkg.version}
@@ -220,6 +221,7 @@ async function main() {
 
   watcher.start();
   const server = createServer(watcher, o, {
+    usageMonitor: o.demo ? null : new UsageMonitor({ ompDir: o.ompDir }),
     onShutdown: () => { watcher.stop(); server.close(); process.exit(0); },
   });
   const shutdown = () => { watcher.stop(); server.closeAllConnections?.(); server.close(() => process.exit(0)); };

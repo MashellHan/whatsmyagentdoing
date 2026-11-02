@@ -195,6 +195,11 @@ function sameOMPPath(s, a, b) {
   return s._ompPathSame;
 }
 
+function sessionFiles(since, ompDir) {
+  return [...claudeFiles(), ...codexFiles(since), ...geminiFiles(), ...copilotFiles(),
+    ...clientFiles(CLIENT_DIRS, since), ...ompFiles(since, ompDirs(ompDir, process.env, home, process.platform))];
+}
+
 class Watcher extends EventEmitter {
   constructor({ hours = 24, interval = 1000, ompDir, magpieSources = process.env.WMAD_MAGPIE_SOURCES,
     magpieUrl = process.env.WMAD_MAGPIE_URL, magpieKey = process.env.WMAD_MAGPIE_KEY } = {}) {
@@ -281,8 +286,7 @@ class Watcher extends EventEmitter {
     // Directory walk every 5s; stat known files every tick.
     if (now - this.lastScan > 5000) {
       this.lastScan = now;
-      this.candidates = [...claudeFiles(), ...codexFiles(since), ...geminiFiles(), ...copilotFiles(),
-        ...clientFiles(CLIENT_DIRS, since), ...ompFiles(since, ompDirs(this.ompDir, process.env, home, process.platform))];
+      this.candidates = sessionFiles(since, this.ompDir);
     }
 
     for (const c of this.candidates) {
@@ -593,4 +597,4 @@ class Watcher extends EventEmitter {
   }
 }
 
-module.exports = { Watcher, CLAUDE_DIR, CODEX_DIR, GEMINI_DIR, CLIENT_DIRS, ompDirs };
+module.exports = { Watcher, CLAUDE_DIR, CODEX_DIR, GEMINI_DIR, CLIENT_DIRS, ompDirs, sessionFiles };

@@ -36,6 +36,18 @@ h1 span { color: #9a6d30; }
 .town-stats span { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 11px; margin-top: 9px; }
 .stat-symbol { font: 600 12px Georgia, serif; color: #5d6053; min-width: 16px; }
 #overview-note { margin: 12px 0 0; font-size: 11px; color: var(--muted); }
+.intro-main { min-width:0; }
+.token-panel { margin-top:10px; display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px; }
+.token-heading { display:flex; align-items:baseline; gap:10px; }
+.token-heading h2 { margin:0; color:var(--muted); font:400 11px/1.6 var(--sans); }
+#token-status { color:var(--muted); font:400 11px/1.6 var(--sans); }
+#token-status:empty { display:none; }
+.token-stats { display:flex; flex-wrap:wrap; gap:4px 16px; margin:0; }
+.token-stats > div { display:flex; align-items:baseline; gap:5px; }
+.token-stats dt { color:var(--muted); font-size:11px; }
+.token-stats dt small { display:none; }
+.token-stats dd { margin:0; color:var(--muted); font:500 13px/1.6 var(--sans); font-variant-numeric:tabular-nums; }
+.token-panel[data-state=unavailable] .token-stats dd { color:var(--muted); }
 .town-map { position: relative; border: 1px solid #cfd8c2; border-radius: 7px; background: radial-gradient(#c5d0b4 .8px, transparent .8px) 0 0 / 13px 13px #e6ecda; padding: 0 24px; }
 .map-caption, .map-footer { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; font: 10px/1.7 var(--mono); color: #536248; }
 .map-caption { padding: 18px 0 12px; letter-spacing: 1px; }

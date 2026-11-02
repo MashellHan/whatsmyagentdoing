@@ -1,7 +1,18 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { activityOf, summarize } = require('../public/town');
+const { activityOf, summarize, formatTokens, weekChange } = require('../public/town');
 const log = status => ({ status, statusSource: 'log', source: 'log', herdrStatus: 'working' });
+
+test('homepage token formatting distinguishes missing records and handles a zero comparison week', () => {
+  assert.equal(formatTokens(null), '—');
+  assert.equal(formatTokens(0), '0');
+  assert.equal(formatTokens(1_250_000), '1.25M');
+  assert.equal(weekChange(120, 100), '+20%');
+  assert.equal(weekChange(50, 100), '-50%');
+  assert.equal(weekChange(0, 0), '0%');
+  assert.equal(weekChange(100, 0), '新增');
+  assert.equal(weekChange(100, null), '—');
+});
 
 test('homepage busy ratio uses final log states, not contradictory Herdr status', () => {
   const a = activityOf(['thinking', 'tool', 'typing', 'idle', 'done'].map(log));

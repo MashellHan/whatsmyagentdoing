@@ -31,6 +31,7 @@ const updater = require('./update');
 const { RulesReader } = require('./rules');
 const { ompResumeCommand } = require('./omp');
 const { dayKey } = require('./parsers');
+const { sanitizeUsage } = require('./usage-schema');
 
 function serveFile(res, root, rel) {
   const file = path.normalize(path.join(root, rel));
@@ -155,14 +156,19 @@ function snapshot(watcher, opts = {}) {
     privacy: opts.privacy !== false, source: watcher.sourceInfo?.() || { kind: opts.demo ? 'demo' : 'logs', presence: 'fresh' } };
 }
 
-function createServer(watcher, opts = {}, { onShutdown, rulesReader } = {}) {
+function createServer(watcher, opts = {}, { onShutdown, rulesReader, usageMonitor } = {}) {
   const rules = rulesReader || (typeof watcher.ruleContext === 'function' ? new RulesReader((team, member) => watcher.ruleContext(team, member)) : null);
   const clients = new Set();
   let last = '';
+  const state = () => {
+    const body = snapshot(watcher, opts);
+    if (usageMonitor) body.usage = sanitizeUsage(usageMonitor.snapshot());
+    return body;
+  };
 
   const push = (force) => {
     let body;
-    try { body = JSON.stringify(snapshot(watcher, opts)); } catch (e) { console.error('snapshot failed:', e.message); return; }
+    try { body = JSON.stringify(state()); } catch (e) { console.error('snapshot failed:', e.message); return; }
     // Compare without the timestamp so idle ticks don't spam clients.
     const sig = body.replace(/^\{"now":\d+,/, '{');
     if (!force && sig === last) return;
@@ -171,6 +177,7 @@ function createServer(watcher, opts = {}, { onShutdown, rulesReader } = {}) {
   };
   const onChange = () => push(false);
   watcher.on('change', onChange);
+  usageMonitor?.on('change', onChange);
   // Status can flip with no new log lines (see view()), so re-check on a clock.
   const clock = setInterval(() => push(false), 5000);
   const heartbeat = setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 20000);
@@ -250,7 +257,7 @@ function createServer(watcher, opts = {}, { onShutdown, rulesReader } = {}) {
       return;
     } else if (url.pathname === '/api/sessions') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(snapshot(watcher, opts)));
+      res.end(JSON.stringify(state()));
     } else if (url.pathname === '/api/shutdown' && req.method === 'POST') {
       // Only our CLI sends this header; a web page can't add a custom header
       // to a cross-site request without a CORS preflight, which we never allow.
@@ -277,14 +284,18 @@ function createServer(watcher, opts = {}, { onShutdown, rulesReader } = {}) {
         'cache-control': 'no-store',
         connection: 'keep-alive',
       });
-      res.write(`data: ${JSON.stringify(snapshot(watcher, opts))}\n\n`);
+      res.write(`data: ${JSON.stringify(state())}\n\n`);
       clients.add(res);
       req.on('close', () => clients.delete(res));
     } else {
       res.writeHead(404).end();
     }
   });
-  server.on('close', () => { clearInterval(clock); clearInterval(heartbeat); watcher.off('change', onChange); });
+  server.once('listening', () => usageMonitor?.start());
+  server.on('close', () => {
+    clearInterval(clock); clearInterval(heartbeat); watcher.off('change', onChange);
+    usageMonitor?.off('change', onChange); usageMonitor?.stop();
+  });
   return server;
 }
 

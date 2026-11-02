@@ -1,8 +1,12 @@
 // Privacy whitelist for the Cloudflare remote view. Used by BOTH the mini-1
 // push agent and the ingest Worker: anything not listed here is dropped.
 // Allowed: team name, member name, agent type, status, timestamps.
+// Optional token usage: aggregate counters, dates, timezone and provider names.
 // Never: prompts, replies, titles, errors, activity, cwd/project, model,
 // session/pane ids, team guidelines (AGENTS.md / TEAMS.md) or any free text.
+
+import usageSchema from '../../src/usage-schema.js';
+const { sanitizeUsage } = usageSchema;
 
 export const OFFLINE_MS = 60_000;
 export const HEARTBEAT_MS = 20_000;
@@ -60,6 +64,7 @@ export function sanitizeSnapshot(input, { sourceOk = true } = {}) {
     teams,
     sessions,
     source: { kind: 'remote', presence: stale ? 'stale' : 'fresh', error: stale ? 'mini-1 本地状态暂不可读，显示上次快照。' : null },
+    ...(raw.usage ? { usage: sanitizeUsage(raw.usage) } : {}),
   };
 }
 

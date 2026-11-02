@@ -37,8 +37,16 @@
       ungroupedAgents: (groups.get('ungrouped') || []).length,
     };
   }
+  function formatTokens(value) {
+    return Number.isSafeInteger(value) && value >= 0 ? new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 }).format(value) : '—';
+  }
+  function weekChange(current, previous) {
+    if (![current, previous].every(value => Number.isSafeInteger(value) && value >= 0)) return '—';
+    if (!previous) return current ? '新增' : '0%';
+    return new Intl.NumberFormat('en-US', { style: 'percent', signDisplay: 'exceptZero', maximumFractionDigits: 1 }).format((current - previous) / previous);
+  }
   // Pure homepage aggregation is also exercised by dependency-free tests.
-  if (typeof module !== 'undefined' && module.exports) { module.exports = { activityOf, summarize }; return; }
+  if (typeof module !== 'undefined' && module.exports) { module.exports = { activityOf, summarize, formatTokens, weekChange }; return; }
   const $ = id => document.getElementById(id);
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   let data = { sessions: [], teams: [] }, connected = false, loaded = false, summary = summarize(data);
@@ -198,6 +206,23 @@
     // A house opens the original page, not a second implementation of Office.
     location.assign(`/office?team=${encodeURIComponent(id)}`);
   }
+  function renderUsage() {
+    const usage = data.usage;
+    const available = ['ready', 'partial'].includes(usage?.status);
+    const stale = !connected || data.source?.presence === 'stale';
+    $('token-panel').dataset.state = usage?.status || 'unavailable';
+    $('token-status').textContent = usage?.status === 'loading' ? '正在汇总用量…' : !available ? '暂无用量记录' : stale ? '上次记录 · 等待连接' : usage.status === 'partial' ? '部分记录暂不可读' : '';
+    for (const [id, key] of [['tokens-today', 'todayTokens'], ['tokens-month', 'monthTokens'], ['tokens-week', 'weekTokens']]) {
+      const value = available ? usage[key] : null;
+      const full = Number.isSafeInteger(value) ? `${value.toLocaleString('zh-CN')} tokens` : '暂无记录';
+      $(id).textContent = formatTokens(value);
+      $(id).title = full;
+      $(id).setAttribute('aria-label', full);
+    }
+    $('tokens-wow').textContent = available ? weekChange(usage.weekTokens, usage.previousWeekTokens) : '—';
+    $('tokens-wow').title = available ? `最近 7 天 ${usage.weekTokens.toLocaleString('zh-CN')}；此前 7 天 ${usage.previousWeekTokens.toLocaleString('zh-CN')} tokens${usage.previousWeekTokens ? '' : '（此前无用量记录）'}` : '暂无记录';
+    $('token-note').textContent = `Token 用量为本机保留日志记录的输入与输出总量，包含缓存命中；未记录的用量不作估算。${usage?.timeZone ? `今日与本月按 ${usage.timeZone} 计算。` : ''}周环比比较最近 7 天与此前 7 天。${usage?.agents?.length ? `记录来源：${usage.agents.join('、')}。` : ''}`;
+  }
   function receive(next) {
     if (!next || !Array.isArray(next.sessions)) return;
     loaded = true;
@@ -211,6 +236,7 @@
     updateConnection();
   }
   function updateConnection() {
+    if (loaded) renderUsage();
     const stale = data.source?.presence === 'stale' || !connected;
     const anyStale = stale || data.teams.some(team => team.presence === 'stale');
     $('connection').dataset.live = !stale;
