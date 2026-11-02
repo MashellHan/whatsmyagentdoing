@@ -59,6 +59,8 @@ async function fits(page, name) {
     };
     await page.goto(base); await page.waitForSelector('.house');
     assert.equal(await page.locator('body').getAttribute('data-layout'), 'compact');
+    assert.equal(await page.locator('[data-team-id=ungrouped] .commons-illustration').count(), 1);
+    assert.equal(await page.locator('[data-team-id=ungrouped] .house-chimney').count(), 0);
     for (const [width, height] of [[1440, 900], [1280, 720], [1024, 768]]) {
       await page.setViewportSize({ width, height });
       measurements.push({ view: 'town', ...await fits(page, 'town ' + width) });
@@ -76,7 +78,7 @@ async function fits(page, name) {
     await fits(page, 'return to compact town');
 
     await page.goto(base + '/office?team=team&quality=mid');
-    const ready = () => page.waitForFunction(() => office?.framesShown > 4 && (officeKind === 'mid' || office.loaded));
+    const ready = () => page.waitForFunction(() => office?.framesShown > 4 && (officeKind === 'mid' || office.loaded) && !document.getElementById('office').classList.contains('loading') && +getComputedStyle(office.canvas).opacity >= 0.99);
     await ready();
     for (const quality of ['mid', 'high']) {
       await page.locator('#qualSeg [data-v=' + quality + ']').click(); await ready();
@@ -96,7 +98,19 @@ async function fits(page, name) {
     await page.goto(base + '/office?quality=mid'); await ready();
     await fits(page, 'all teams office');
 
-    for (const url of [base, base + '/office?team=team&quality=mid']) {
+    for (const quality of ['mid', 'high']) {
+      await page.goto(base + '/office?team=ungrouped&quality=' + quality); await ready();
+      assert.equal(await page.locator('h1').innerText(), '活动广场');
+      assert.match(await page.locator('#teamScope').innerText(), /AGENT COMMONS/);
+      assert.match(await page.locator('.roster-heading').innerText(), /广场上的 agent/);
+      assert.equal(await page.locator('#sceneGroup').isVisible(), false);
+      assert.ok(await page.evaluate(() => office.commons && office.plan.windows.length === 0));
+      assert.equal(await page.locator('.team-member').count(), 2);
+      await fits(page, quality + ' commons');
+      await capture('commons-' + quality + '-1440');
+    }
+
+    for (const url of [base, base + '/office?team=team&quality=mid', base + '/office?team=ungrouped&quality=mid']) {
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto(url); await page.waitForSelector(url === base ? '.house' : '#office canvas'); await settle(page);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'mobile stays readable without horizontal scrolling');

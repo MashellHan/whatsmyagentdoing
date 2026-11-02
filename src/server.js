@@ -151,7 +151,7 @@ function snapshot(watcher, opts = {}) {
   const raw = watcher.sessions();
   const sessions = raw.map((s) => view(s, now, opts));
   sessions.sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
-  const teams = watcher.teams ? watcher.teams() : sessions.length ? [{ id: 'ungrouped', workspaceId: null, name: opts.demo ? '演示小屋' : '未分组', label: '未分组', presence: 'fresh' }] : [];
+  const teams = watcher.teams ? watcher.teams() : sessions.length ? [{ id: 'ungrouped', workspaceId: null, name: opts.demo ? '演示小屋' : '活动广场', label: '活动广场', presence: 'fresh' }] : [];
   return { now, lang: opts.demo || opts.privacy !== false ? null : promptLanguage(raw), sessions, teams, summary: summary(sessions, now),
     privacy: opts.privacy !== false, source: watcher.sourceInfo?.() || { kind: opts.demo ? 'demo' : 'logs', presence: 'fresh' } };
 }

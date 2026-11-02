@@ -5,9 +5,9 @@ const vm = require('node:vm');
 const path = require('node:path');
 const context = { window: {}, Image: class {}, console };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/office.js'), 'utf8'), context);
-function office() {
+function office(commons = false) {
   const o = Object.create(context.window.Office.prototype);
-  Object.assign(o, { pal: new Proxy({}, { get: (_, key) => key === 'dark' ? false : '#888888' }), people: new Map(), deskOf: new Map(), first: true });
+  Object.assign(o, { commons, pal: new Proxy({}, { get: (_, key) => key === 'dark' ? false : '#888888' }), people: new Map(), deskOf: new Map(), first: true });
   o.plan = o.buildPlan(0); return o;
 }
 function member(i, status = 'idle', role = 'member') {
@@ -58,4 +58,18 @@ test('linked log states override contradictory Herdr metadata for actions and re
 test('unmodified log sessions keep original off-duty wandering behavior', () => {
   const o = office(); o.update(Array.from({ length: 12 }, (_, i) => ({ ...member(i), source: 'log' })));
   assert.equal(o.people.size, 7); assert.equal(o.offDuty, 5); assert.equal(o.deskOf.size, 0);
+});
+
+test('commons grows open stations for independent agents and never reserves a leader seat', () => {
+  const o = office(true);
+  assert.equal(o.plan.windows.length, 0);
+  assert.ok(o.plan.props.every(prop => prop.t.startsWith('commons-')));
+  o.update([member(0, 'done', 'leader'), ...Array.from({ length: 32 }, (_, i) => member(i + 1, 'working'))]);
+  assert.equal(o.leaderDesk, null);
+  assert.equal(o.deskOf.size, 32);
+  assert.ok(o.plan.desks.length >= 32);
+  assert.equal(o.people.get('p0').mode, 'wander');
+  for (const desk of o.plan.desks) {
+    assert.ok(o.plan.grid.path(o.plan.door.x, o.plan.door.y, desk.seat.x, desk.seat.y).length, 'every open station has a walkable approach');
+  }
 });

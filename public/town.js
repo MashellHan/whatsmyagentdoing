@@ -151,17 +151,39 @@
       <g class="sleeping-cat"><ellipse cx="176" cy="229" rx="19" ry="4" fill="#a8b292" opacity=".5"/><path d="M160 225q0-14 13-12 13 0 14 10-8 6-22 4" fill="#b29a79" stroke="#7e715e"/><path d="m176 217 2-7 6 4 5-3 1 9q-6 7-13 0Z" fill="#c4ae8e" stroke="#7e715e"/><path d="m178 219 3 1m3-1 3-1m-21 4q-13 4-10-5" stroke="#6e6455" fill="none" stroke-linecap="round"/><text class="rest-symbol" x="189" y="208" fill="#635f50" font-size="17" font-family="Georgia,serif" font-weight="bold">Zzz</text></g>
     </svg>`;
   }
+  function commonsArt() {
+    return `<svg class="commons-illustration" viewBox="0 0 300 245" aria-hidden="true">
+      <rect x="28" y="32" width="244" height="190" rx="48" fill="#bdcfa9" stroke="#8fa581" stroke-width="2"/>
+      <path d="M150 32v190M28 127h244" stroke="#e9dfc6" stroke-width="34"/>
+      <circle cx="150" cy="127" r="68" fill="#ece3cc" stroke="#b9ad8b" stroke-width="2"/>
+      <circle cx="150" cy="127" r="49" fill="none" stroke="#cdc1a2" stroke-width="2" stroke-dasharray="3 7"/>
+      <circle cx="150" cy="127" r="29" fill="#8eb9b0" stroke="#557f76" stroke-width="5"/>
+      <circle class="commons-water" cx="150" cy="127" r="18" fill="none" stroke="#d5ebe1" stroke-width="2"/>
+      <path d="M150 115v24m-12-12h24" stroke="#d5ebe1" stroke-width="2"/>
+      <g fill="#a8875e" stroke="#6e765a" stroke-width="2">
+        <rect x="120" y="47" width="60" height="12" rx="3"/><rect x="120" y="195" width="60" height="12" rx="3"/>
+        <rect x="47" y="98" width="12" height="58" rx="3"/><rect x="241" y="98" width="12" height="58" rx="3"/>
+      </g>
+      <g fill="#73936a" stroke="#53734f" stroke-width="2">
+        <circle cx="60" cy="62" r="21"/><circle cx="240" cy="62" r="21"/><circle cx="60" cy="192" r="19"/><circle cx="240" cy="192" r="19"/>
+      </g>
+      <g fill="#b7cd9e"><circle cx="55" cy="57" r="10"/><circle cx="235" cy="57" r="10"/><circle cx="55" cy="188" r="9"/><circle cx="235" cy="188" r="9"/></g>
+      <g fill="#f2e7c4" stroke="#89927a" stroke-width="2"><circle cx="94" cy="79" r="5"/><circle cx="206" cy="79" r="5"/><circle cx="94" cy="175" r="5"/><circle cx="206" cy="175" r="5"/></g>
+    </svg>`;
+  }
   function renderHouses() {
     const ids = new Set();
     summary = summarize(data);
     $('houses').dataset.count = data.teams.length;
     summary.houses.forEach(({ team, activity: a }, index) => {
+      const commons = team.id === 'ungrouped';
       ids.add(team.id);
       let house = houses.get(team.id);
       if (!house) {
         house = document.createElement('button'); house.type = 'button'; house.className = 'house';
         house.dataset.testid = 'house'; house.dataset.teamId = team.id;
-        house.innerHTML = `<span class="house-art-stage">${houseArt(index)}</span><span class="house-sign"></span>`;
+        house.classList.toggle('commons', commons);
+        house.innerHTML = `<span class="house-art-stage">${commons ? commonsArt() : houseArt(index)}</span><span class="house-sign"></span>`;
         house.addEventListener('click', () => navigate(team.id));
         houses.set(team.id, house); $('houses').appendChild(house);
         contentObserver.observe(house.querySelector('.house-art-stage'));
@@ -172,14 +194,15 @@
       house.dataset.stale = isStale(team);
       house.dataset.working = a.busy;
       house.dataset.total = a.total;
-      house.querySelector('.activity-emblem-text').textContent = ACTIVITY_SYMBOLS[a.kind];
-      const name = team.name || team.label || team.id;
+      const emblem = house.querySelector('.activity-emblem-text');
+      if (emblem) emblem.textContent = ACTIVITY_SYMBOLS[a.kind];
+      const name = commons ? '活动广场' : team.name || team.label || team.id;
       const issues = [a.attention ? `${a.attention} 位等待处理` : '', a.unknown ? `${a.unknown} 位状态未明` : ''].filter(Boolean);
-      const note = issues.length ? issues.join(' · ') : a.kind === 'idle' ? '窗帘合上，小猫打盹' : a.kind === 'empty' ? '房子还在，等成员回来' : '烟囱冒烟，小旗飘动';
+      const note = issues.length ? issues.join(' · ') : commons ? '独立启动，自由来去' : a.kind === 'idle' ? '窗帘合上，小猫打盹' : a.kind === 'empty' ? '房子还在，等成员回来' : '烟囱冒烟，小旗飘动';
       const source = a.fallback ? `${a.logs} 日志 · ${a.fallback} Herdr 回退` : a.total ? '状态来源：会话日志' : '暂无成员状态';
-      const roles = roleSummary(team.id);
+      const roles = commons ? '' : roleSummary(team.id);
       house.dataset.label = `进入 ${name} · ${ACTIVITY_LABELS[a.kind]} · ${a.busy}/${a.total} 正在忙 · ${note} · ${source}${roles ? ` · ${roles}` : ''}`;
-      const content = `<span class="house-number"><span>${escape(team.id)} / ${team.id === 'ungrouped' ? 'SESSION HOUSE' : 'TEAM HOUSE'}</span><span class="house-arrow" aria-hidden="true">↗</span></span>
+      const content = `<span class="house-number"><span>${commons ? 'AGENT COMMONS' : `${escape(team.id)} / TEAM HOUSE`}</span><span class="house-arrow" aria-hidden="true">↗</span></span>
         <span class="house-name">${escape(name)}</span>
         <span class="house-meta"><span class="status-chip" data-status="${a.kind}"><span class="state-symbol" aria-hidden="true">${ACTIVITY_SYMBOLS[a.kind]}</span>${ACTIVITY_LABELS[a.kind]}</span><span class="busy-ratio"><b>${a.busy}/${a.total}</b> 正在忙</span></span>
         <span class="house-divider" aria-hidden="true"></span>
@@ -199,7 +222,7 @@
     $('busy-team-count').textContent = summary.busyTeams;
     $('idle-team-count').textContent = summary.idleTeams;
     $('working-count').textContent = summary.workingAgents;
-    $('overview-note').textContent = `${summary.teams} 个团队${summary.otherTeams ? ` · ${summary.otherTeams} 个待处理 / 未明 / 空屋` : ''}${summary.ungroupedAgents ? ` · 另有 ${summary.ungroupedAgents} 位未分组成员` : ''}`;
+    $('overview-note').textContent = `${summary.teams} 个团队${summary.otherTeams ? ` · ${summary.otherTeams} 个待处理 / 未明 / 空屋` : ''}${summary.ungroupedAgents ? ` · 广场上 ${summary.ungroupedAgents} 位 agent` : ''}`;
     scheduleLayout();
   }
   function navigate(id) {
@@ -228,7 +251,7 @@
     loaded = true;
     data = next;
     if (!Array.isArray(data.teams)) data.teams = [];
-    if (!data.teams.length && data.sessions.length) data.teams = [{ id: 'ungrouped', name: '未分组', presence: 'fresh' }];
+    if (!data.teams.length && data.sessions.length) data.teams = [{ id: 'ungrouped', name: '活动广场', presence: 'fresh' }];
     renderHouses();
     let fromHash = null;
     try { fromHash = new URLSearchParams(location.hash.slice(1)).get('team'); } catch {}

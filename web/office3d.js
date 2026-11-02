@@ -220,6 +220,7 @@ export class Office3D extends window.Office {
 
   build() {
     if (this.plan.scene) return this.buildScene();
+    if (this.commons) return this.buildCommons();
     const plan = this.plan;
     if (this.room) { this.scene.remove(this.room); }
     this.room = new THREE.Group();
@@ -303,6 +304,46 @@ export class Office3D extends window.Office {
     for (const dk of plan.desks) this.buildDesk(dk);
 
     for (const p of plan.props) this.buildProp(p);
+    this.fitCamera3D(true);
+  }
+
+  buildCommons() {
+    if (this.room) this.scene.remove(this.room);
+    this.room = new THREE.Group(); this.scene.add(this.room);
+    this.screens.clear(); this.blinkers = []; this.windowMat = null; this.rods = null;
+    const { W, D } = this.plan;
+    this.boxMesh(0, 0, -0.12, W, D, 0.12, this.pal.dark ? '#2d4332' : '#bad0a4');
+    this.boxMesh(1.1, 1.1, 0, W - 2.2, D - 2.2, 0.025, this.pal.dark ? '#5a5945' : '#e7dfc9');
+    this.boxMesh(W / 2 - 0.6, D - 1.2, 0, 1.2, 1.2, 0.025, this.pal.dark ? '#5a5945' : '#e7dfc9');
+    for (const desk of this.plan.desks) {
+      const { x, y, seat } = desk;
+      for (const [lx, ly] of [[0.08, 0.08], [1.22, 0.08], [0.08, 0.62], [1.22, 0.62]]) this.boxMesh(x + lx, y + ly, 0, 0.1, 0.1, 0.72, '#927953');
+      this.boxMesh(x, y, 0.72, 1.4, 0.8, 0.07, '#cdb384');
+      this.boxMesh(x + 0.4, y + 0.15, 0.79, 0.6, 0.3, 0.025, '#bbc5b9');
+      const screen = this.boxMesh(x + 0.4, y + 0.45, 0.8, 0.6, 0.035, 0.35, '#263f33');
+      this.screens.set(desk, screen);
+      this.boxMesh(seat.x - 0.06, seat.y - 0.06, 0, 0.12, 0.12, 0.34, '#6d6c53');
+      this.boxMesh(seat.x - 0.25, seat.y - 0.22, 0.34, 0.5, 0.44, 0.08, '#bda375');
+    }
+    for (const prop of this.plan.props) {
+      const { x, y } = prop;
+      if (prop.t === 'commons-tree') {
+        this.boxMesh(x - 0.08, y - 0.08, 0, 0.16, 0.16, 1.5, '#8a714f');
+        const crown = new THREE.Mesh(new THREE.DodecahedronGeometry(0.75, 1), new THREE.MeshStandardMaterial({ color: this.pal.dark ? '#4e794b' : '#7b9f62', roughness: 1 }));
+        crown.position.set(x, 1.65, y); crown.scale.y = 1.15; crown.castShadow = true;
+        this.room.add(crown);
+      } else if (prop.t === 'commons-bench') {
+        for (const offset of [0.15, 1.35]) this.boxMesh(x + offset, y + 0.1, 0, 0.1, 0.3, 0.4, '#627151');
+        this.boxMesh(x, y, 0.38, 1.6, 0.5, 0.1, '#bb9c6a');
+        this.boxMesh(x, y, 0.53, 1.6, 0.09, 0.28, '#bb9c6a');
+      } else if (prop.t === 'commons-fountain') {
+        const basin = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.2, 32), new THREE.MeshStandardMaterial({ color: '#c4c0a3', roughness: 0.9 }));
+        basin.position.set(x, 0.1, y); basin.receiveShadow = true; this.room.add(basin);
+        const water = new THREE.Mesh(new THREE.CircleGeometry(0.56, 32), new THREE.MeshStandardMaterial({ color: '#82b3a5', roughness: 0.25 }));
+        water.rotation.x = -Math.PI / 2; water.position.set(x, 0.205, y); this.room.add(water);
+        this.boxMesh(x - 0.07, y - 0.07, 0.2, 0.14, 0.14, 0.45, '#c1d0b1');
+      }
+    }
     this.fitCamera3D(true);
   }
 

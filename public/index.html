@@ -355,8 +355,10 @@ function applyLang(code) {
 }
 
 const TEAM = new URLSearchParams(location.search).get('team') || null;
+const COMMONS = TEAM === 'ungrouped';
 const PREF_PREFIX = TEAM ? `wmad.team.${encodeURIComponent(TEAM)}.` : 'wmad.';
 if (TEAM) document.body.classList.add('team-office');
+if (COMMONS) document.body.classList.add('agent-commons');
 const store = (() => {
   const fallback = new Map();
   const get = (k, d) => { try { const v = localStorage.getItem(PREF_PREFIX + k); return v == null ? d : JSON.parse(v); } catch { return fallback.has(k) ? fallback.get(k) : d; } };
@@ -544,20 +546,26 @@ function configurationTags(s) {
 function renderTeam() {
   if (!TEAM) return;
   const team = state.data.teams?.find(t => t.id === TEAM);
-  const name = team?.name || TEAM;
+  const name = COMMONS ? '活动广场' : team?.name || TEAM;
   document.getElementById('pipTeam').hidden = !PIP;
   document.getElementById('pipTeam').textContent = `${name} · ${TEAM}`;
   document.querySelector('h1').textContent = name;
-  document.getElementById('teamScope').textContent = `${TEAM} / TEAM HOUSE`;
+  document.getElementById('teamScope').textContent = COMMONS ? 'AGENT COMMONS · 开放活动区' : `${TEAM} / TEAM HOUSE`;
   document.title = `${name} · ${state.view === 'office' ? L.office : L.list}`;
   document.getElementById('statusPolicy').hidden = PIP;
   document.getElementById('teamRoster').hidden = PIP;
+  if (COMMONS) {
+    document.title = `活动广场 · ${state.view === 'office' ? 'Agent Commons' : L.list}`;
+    document.getElementById('teamRoster').setAttribute('aria-label', '广场上的 agent');
+    document.querySelector('.roster-heading h2').textContent = '广场上的 agent';
+    document.querySelector('#viewSeg [data-v=office]').textContent = '开放广场';
+  }
   const warning = document.getElementById('teamSourceWarning');
   warning.hidden = state.data.source?.presence !== 'stale';
   warning.textContent = 'Herdr 身份快照已过期，保留上次团队关系；日志状态继续独立更新。';
   const members = state.data.sessions.slice().sort((a, b) => (b.role === 'leader') - (a.role === 'leader') || String(a.paneId || a.key).localeCompare(String(b.paneId || b.key), undefined, { numeric: true }));
   document.getElementById('memberCount').textContent = `${members.length}`;
-  document.getElementById('leaderNote').textContent = members.some(s => s.role === 'leader')
+  document.getElementById('leaderNote').textContent = COMMONS ? '独立启动的 agent，自由使用共享工位。' : members.some(s => s.role === 'leader')
     ? '★ Leader 保留主位；空闲不显示工作动作。' : 'Leader 未显式配置，不推断成员角色。';
   // Keep rows and expanded panels alive across SSE updates, preserving keyboard
   // focus and the reader's scroll position while status/configuration changes.
@@ -578,7 +586,7 @@ function renderTeam() {
       summary = replacement;
     }
     const content = `<span class="member-identity"><span class="agent ${esc(s.agent)}">${agentLogo(s.agent)}</span><span class="member-name">${esc(s.displayName || s.project || s.id)}</span>${roleBadge(s)}</span>
-      <span class="member-meta">${esc(AGENT_NAME[s.agent] || s.agent)} · ${esc(s.paneId || '未分组日志')}</span>
+      <span class="member-meta">${esc(AGENT_NAME[s.agent] || s.agent)} · ${esc(s.paneId || '独立会话')}</span>
       ${configurationTags(s)}
       <span class="member-state" data-s="${esc(s.status)}"><span class="dot"></span><span>${esc(L[s.status] || s.status)}</span><code>${esc(s.status)}</code></span>
       <span class="member-sources">${sourceBadge(s)}${s.presence === 'stale' ? '<span class="stale-chip">身份 stale</span>' : ''}</span>`;
@@ -832,7 +840,7 @@ function syncControls() {
   document.querySelectorAll('#viewSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === state.view));
   document.querySelectorAll('#qualSeg button').forEach((b) => b.classList.toggle('on', b.dataset.v === state.quality));
   document.getElementById('qualSeg').style.display = state.view === 'office' ? '' : 'none';
-  document.getElementById('sceneGroup').hidden = state.view !== 'office' || state.quality !== 'high';
+  document.getElementById('sceneGroup').hidden = COMMONS || state.view !== 'office' || state.quality !== 'high';
   const activeFilter = document.getElementById('activeFilter');
   activeFilter.hidden = state.agent === 'all';
   activeFilter.textContent = AGENT_NAME[state.agent] || '';
@@ -875,6 +883,7 @@ function refreshTip() {
 }
 function hideTip() { tipKey = null; tipPinned = false; tip.style.display = 'none'; tip.classList.remove('pinned'); }
 const officeOpts = {
+  commons: COMMONS,
   compact: PIP,
   screenLabels: true,
   onFrame: (renderer) => popout?.drawPreview(renderer),
@@ -963,7 +972,7 @@ function setLoading(on, text) {
 }
 async function makeOffice() {
   const high = state.quality === 'high';
-  const scene = high && state.scene !== 'office' && state.scenes.some((x) => x.id === state.scene) ? state.scene : 'office';
+  const scene = high && !COMMONS && state.scene !== 'office' && state.scenes.some((x) => x.id === state.scene) ? state.scene : 'office';
   const kind = high ? `high:${scene}` : 'mid';
   if (kind === officeKind) return;
   officeKind = kind;
@@ -993,7 +1002,7 @@ async function makeOffice() {
     if (high) { state.quality = 'mid'; store.set('quality', 'mid'); officeKind = 'mid'; syncControls(); }
   }
   office = mine;
-  office.offDutyLabel = L.wentHome;
+  office.offDutyLabel = COMMONS ? '在广场外休息' : L.wentHome;
   render();
   const ok = await mine.ready;
   if (office !== mine) return;

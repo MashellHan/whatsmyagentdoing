@@ -194,13 +194,14 @@
   // ---------------------------------------------------------------- office
 
   class Office {
-    constructor(root, { onHover, label, onFrame, showAgent = true, compact = false, screenLabels = compact, lightTheme = false } = {}) {
+    constructor(root, { onHover, label, onFrame, showAgent = true, compact = false, screenLabels = compact, lightTheme = false, commons = false } = {}) {
       this.root = root;
       this.onHover = onHover || (() => {});
       this.label = label || ((s) => s.displayName || s.paneId || s.project || s.agent);
       this.onFrame = onFrame;
       this.showAgent = showAgent;
       this.compact = compact;
+      this.commons = commons;
       this.screenLabels = screenLabels;
       this.cw = this.ch = this.dpr = 1;
       this.offDutyLabel = 'went home';
@@ -255,6 +256,7 @@
     // ------------------------------------------------------------ floor plan
 
     buildPlan(nWorking) {
+      if (this.commons) return this.buildCommonsPlan(nWorking);
       const pal = this.pal;
       const pods = Math.max(2, Math.ceil((nWorking + 2) / 4));
       const podCols = pods <= 4 ? 2 : 3;
@@ -465,6 +467,36 @@
       return { W, D, OW, OD, MR, PY, RW, grid, items, props, pois, desks, windows, posters, pp, door: { x: 0.4, y: D - 1.2 } };
     }
 
+    buildCommonsPlan(nWorking) {
+      const columns = nWorking > 16 ? 3 : 2;
+      const rows = Math.max(2, Math.ceil((nWorking + 2) / (columns * 2)));
+      const W = columns * 4 + 2.4, D = Math.max(12, rows * 3.2 + 5);
+      const grid = new Grid(W, D), desks = [], items = [], props = [], pois = [];
+      for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) for (let seat = 0; seat < 2; seat++) {
+        const x = 1.5 + col * 4 + seat * 1.5, y = 2 + row * 3.2;
+        desks.push({ x, y, side: 'n', seat: { x: x + 0.7, y: y - 0.45 } });
+        grid.block(x, y, 1.4, 0.8, 0.06);
+      }
+      for (const [x, y] of [[0.65, 0.8], [W - 0.65, 0.8], [0.65, D / 2], [W - 0.65, D / 2], [0.65, D - 0.8], [W - 0.65, D - 0.8]]) {
+        props.push({ t: 'commons-tree', x, y });
+        items.push({ depth: x + y, draw: () => this.commonsTree(x, y) });
+        grid.block(x - 0.25, y - 0.25, 0.5, 0.5, 0.08);
+      }
+      for (const x of [1.6, W - 3.2]) {
+        const y = D - 2;
+        props.push({ t: 'commons-bench', x, y });
+        items.push({ depth: x + 0.8 + y, draw: () => this.commonsBench(x, y) });
+        grid.block(x, y, 1.6, 0.2, 0.06);
+        for (const offset of [0.4, 1.2]) pois.push({ x: x + offset, y: y + 0.45, act: 'couch', face: 'front', sit: 0.34 });
+      }
+      props.push({ t: 'commons-fountain', x: W / 2, y: D - 2 });
+      items.push({ depth: W / 2 + D - 2, draw: () => this.commonsFountain(W / 2, D - 2) });
+      grid.block(W / 2 - 0.6, D - 2.6, 1.2, 1.2, 0.08);
+      for (let y = 2; y < D - 3; y += 2) for (const x of [0.9, W - 0.9]) pois.push({ x, y, act: null, face: 'front', sit: 0 });
+      return { W, D, grid, desks, items, props, pois, windows: [], posters: [], pp: null,
+        noNap: true, viewH: 2.6, door: { x: W / 2, y: D - 0.4 } };
+    }
+
     glassX(add, x, y, d) {
       add(x + y + d / 2 + 0.02, () => {
         const P = (a, b, c) => this.iso(a, b, c);
@@ -486,9 +518,10 @@
     update(sessions) {
       // Original activity controls desks vs wandering; team membership does
       // not imply work. Only the explicit leader retains a neutral main seat.
-      const working = sessions.filter((s) => s.role === 'leader' || WORKING.has(s.status));
+      const isLeader = s => !this.commons && s.role === 'leader';
+      const working = sessions.filter((s) => isLeader(s) || WORKING.has(s.status));
       const off = sessions
-        .filter((s) => s.role !== 'leader' && !WORKING.has(s.status))
+        .filter((s) => !isLeader(s) && !WORKING.has(s.status))
         .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
       const wanderers = off.slice(0, MAX_WANDERERS);
       this.offDuty = off.length - wanderers.length;
@@ -506,7 +539,7 @@
       // Fill the desks that face us first so more faces and screens show.
       const desks = this.plan.desks;
       const order = desks.map((d, i) => i).sort((a, b) => (desks[a].side === 's') - (desks[b].side === 's') || a - b);
-      const leader = working.find(s => s.role === 'leader');
+      const leader = working.find(isLeader);
       this.leaderDesk = leader ? order[0] : null;
       if (leader) {
         // Reserve the main seat even when the leader arrives after members.
@@ -750,6 +783,7 @@
     // ------------------------------------------------------------ room shell
 
     drawRoom() {
+      if (this.commons) return this.drawCommonsRoom();
       const { W, D, OW, MR, PY, pp } = this.plan;
       const pal = this.pal;
       const P = (x, y, z) => this.iso(x, y, z);
@@ -846,6 +880,39 @@
     }
 
     // ------------------------------------------------------------ furniture
+
+    drawCommonsRoom() {
+      const { W, D } = this.plan, P = (x, y) => this.iso(x, y);
+      this.poly([P(0, 0), P(W, 0), P(W, D), P(0, D)], this.pal.dark ? '#2d4332' : '#bad0a4');
+      for (let x = 1.1; x < W - 1.1; x++) for (let y = 1.1; y < D - 1.1; y++) {
+        const x1 = Math.min(x + 1, W - 1.1), y1 = Math.min(y + 1, D - 1.1);
+        this.poly([P(x, y), P(x1, y), P(x1, y1), P(x, y1)], this.pal.dark ? '#5a5945' : (Math.round(x + y) % 2 ? '#e5dcc4' : '#ece4d0'));
+      }
+      this.poly([P(W / 2 - 0.6, D - 1.2), P(W / 2 + 0.6, D - 1.2), P(W / 2 + 0.6, D), P(W / 2 - 0.6, D)], this.pal.dark ? '#5a5945' : '#e5dcc4');
+    }
+
+    commonsTree(x, y) {
+      this.box(x - 0.09, y - 0.09, 0, 0.18, 0.18, 1.35, '#a98b62', '#816b4e', '#725c42');
+      const p = this.iso(x, y, 1.7), c = this.ctx;
+      c.fillStyle = this.pal.dark ? '#426b44' : '#71965d';
+      c.beginPath(); c.ellipse(p.x, p.y, 23, 28, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = this.pal.dark ? '#547d4f' : '#96b77b';
+      c.beginPath(); c.ellipse(p.x - 6, p.y - 7, 14, 18, -0.3, 0, Math.PI * 2); c.fill();
+    }
+
+    commonsBench(x, y) {
+      for (const offset of [0.15, 1.35]) this.box(x + offset, y + 0.1, 0, 0.1, 0.3, 0.4, '#69775c', '#5a684e', '#4b5c42');
+      this.box(x, y, 0.38, 1.6, 0.5, 0.1, '#c6a674', '#a88a5e', '#96774d');
+      this.box(x, y, 0.53, 1.6, 0.09, 0.28, '#c6a674', '#a88a5e', '#96774d');
+    }
+
+    commonsFountain(x, y) {
+      const p = this.iso(x, y, 0.18), c = this.ctx;
+      c.fillStyle = '#aaa889'; c.beginPath(); c.ellipse(p.x, p.y + 3, 28, 14, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#e2ddc4'; c.beginPath(); c.ellipse(p.x, p.y, 28, 14, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#87b4a9'; c.beginPath(); c.ellipse(p.x, p.y, 21, 10, 0, 0, Math.PI * 2); c.fill();
+      this.box(x - 0.07, y - 0.07, 0.2, 0.14, 0.14, 0.45, '#d4ddbf', '#b6c1a8', '#9caa93');
+    }
 
     plant(x, y) {
       const pal = this.pal;
@@ -1098,6 +1165,14 @@
     desk(dk, p) {
       const pal = this.pal;
       const { x, y } = dk;
+      if (this.commons) {
+        for (const [lx, ly] of [[0.08, 0.08], [1.22, 0.08], [0.08, 0.62], [1.22, 0.62]]) this.box(x + lx, y + ly, 0, 0.1, 0.1, 0.72, '#9a815c', '#836b4c', '#735d42');
+        this.box(x, y, 0.72, 1.4, 0.8, 0.07, '#d2b88a', '#b59a6f', '#a68b60');
+        this.box(x + 0.4, y + 0.15, 0.79, 0.6, 0.3, 0.025, '#ccd3c5', '#969f95', '#7c887e');
+        this.box(x + 0.38, y + 0.44, 0.8, 0.64, 0.045, 0.36, '#64766c', '#536458', '#475b4e');
+        this.screen(x + 0.43, y + 0.49, 0.84, 0.54, 0.28, p?.mode === 'work' ? p : null);
+        return;
+      }
       for (const [lx, ly] of [[0.05, 0.05], [1.27, 0.05], [0.05, 0.67], [1.27, 0.67]]) {
         this.box(x + lx, y + ly, 0, 0.08, 0.08, 0.72, pal.deskL, pal.deskL, pal.deskR);
       }
@@ -1187,6 +1262,11 @@
     chair(dk, p) {
       const pal = this.pal;
       const sx = dk.seat.x - 0.25, sy = dk.seat.y - 0.22;
+      if (this.commons) {
+        this.box(sx + 0.17, sy + 0.14, 0, 0.12, 0.12, 0.34, '#7e795f', '#6a6b53', '#5b604a');
+        this.box(sx, sy, 0.34, 0.5, 0.44, 0.08, '#bc9f72', '#a58a61', '#91774f');
+        return;
+      }
       const seated = p && !p.path.length && p.pose === 'sit' && Math.hypot(p.x - dk.seat.x, p.y - dk.seat.y) < 0.05;
       const ox = seated ? 0 : 0.12, oy = seated ? 0 : dk.side === 's' ? 0.18 : -0.18;
       this.box(sx + 0.22 + ox, sy + 0.19 + oy, 0, 0.06, 0.06, 0.32, '#222', '#222', '#111');

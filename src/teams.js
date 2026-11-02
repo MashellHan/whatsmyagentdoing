@@ -84,7 +84,7 @@ class TeamWatcher extends EventEmitter {
     const hidden = this.hiddenTeamIds();
     const teams = this.herdr.teams().filter(team => !hidden.has(team.id));
     if (this.sessions().some(s => s.teamId === 'ungrouped')) teams.push({
-      id: 'ungrouped', name: '未分组', label: '未分组', presence: 'fresh',
+      id: 'ungrouped', name: '活动广场', label: '活动广场', presence: 'fresh',
     });
     return teams;
   }

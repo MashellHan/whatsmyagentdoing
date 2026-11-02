@@ -46,6 +46,7 @@ async function layoutCheck(page, width) {
       // SVG geometry, not just the parent button. Include the entire yard and cat/Zzz.
       for (const selector of ['.lot-garden', '.sleeping-cat']) {
         const el = n.querySelector(selector);
+        if (!el) continue;
         if (getComputedStyle(el).visibility === 'visible' && gap(box(el),sign) < clearance) issues.push(`${selector} near sign ${i}`);
       }
       for (const el of n.querySelectorAll('.lot-garden, .sleeping-cat, .roof-pennant, .smoke')) {
@@ -136,6 +137,9 @@ async function layoutCheck(page, width) {
     assert.equal(await page.locator('#busy-team-count').innerText(), '1');
     assert.equal(await page.locator('#idle-team-count').innerText(), '1');
     assert.equal(await page.locator('#working-count').innerText(), '4');
+    assert.equal(await house('ungrouped').locator('.commons-illustration').count(), 1);
+    assert.equal(await house('ungrouped').locator('.house-chimney').count(), 0);
+    assert.match(await house('ungrouped').innerText(), /AGENT COMMONS.*活动广场/s);
     assert.match(await house('w1').innerText(), /3\/5.*正在忙/);
     assert.match(await house('w1').locator('.house-roles').innerText(), /leader 1 · dev 1 · designer 1/);
     assert.equal((await page.locator('body').innerText()).includes('PRIVATE'), false);

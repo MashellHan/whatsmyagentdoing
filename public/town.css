@@ -66,6 +66,10 @@ h1 span { color: #9a6d30; }
 .house { --lot-offset: 0px; --house-size: 1.06; position: relative; z-index: 2; min-width: 0; align-self: start; display: flex; flex-direction: column; gap: 8px; border: 0; border-radius: 8px; background: transparent; padding: 0; text-align: center; cursor: pointer; transform: translateY(var(--lot-offset)); }
 .house:focus-visible { z-index: 3; }
 .house-art-stage { display: block; padding-top: max(42px,calc(var(--art-height) * .18 + 12px)); }
+.commons-illustration { display: block; width: 100%; height: var(--art-height); }
+.commons .house-sign { border-color: #9eb69a; background: #f7faef; }
+.commons .house-name { color: #355643; }
+.commons[data-activity=busy] .commons-water { stroke: #f5ffed; stroke-width: 4; }
 .house-illustration { display: block; width: 100%; height: var(--art-height); overflow: visible; transform: scale(var(--house-size, 1)); transform-origin: center bottom; transition: transform .25s; }
 .house-sign { position: relative; display: block; width: min(100%, 350px); min-height: 180px; margin: 0 auto; padding: 12px 16px; background: #fffcf2; border: 1px solid #c3d0b7; border-radius: 4px; box-shadow: 0 3px 0 #b8c8a880, 0 6px 14px #4c66430a; overflow-wrap: anywhere; }
 .house-number { display: flex; align-items: center; justify-content: space-between; gap: 6px; font: 10px/1.6 var(--mono); color: #5e6955; margin-bottom: 4px; }

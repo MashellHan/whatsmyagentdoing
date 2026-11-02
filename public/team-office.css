@@ -49,6 +49,19 @@ body.pip .wrap { max-width:none; }
 #stageScale button { min-height:32px; }
 body.pip #stageScale, body.pip #agentLegend { display:none; }
 .stage-note { max-width:64ch; }
+.agent-commons { --bg:#f4f7ed; --panel:#fbfcf5; --ink:#2e483b; --muted:#60705d; --line:#ccd8c2; }
+.agent-commons h1 { color:#355b43; }
+.agent-commons .office { background:#e3edd8; border-color:#b8cbae; border-radius:16px; }
+.agent-commons .team-roster { background:#f7faef; border-color:#b8cbae; border-radius:8px; }
+.agent-commons .roster-heading h2 { color:#355b43; }
+.agent-commons .grid .card { border-color:#b8cbae; }
+@media(prefers-color-scheme:dark) {
+  .agent-commons { --bg:#17261d; --panel:#203025; --ink:#dce7d3; --muted:#a9b9a0; --line:#42523a; }
+  .agent-commons h1, .agent-commons .roster-heading h2 { color:#b4d2a3; }
+  .agent-commons .office { background:#25372b; border-color:var(--line); }
+  .agent-commons .team-roster { background:var(--panel); border-color:var(--line); }
+  .agent-commons .grid .card { border-color:var(--line); }
+}
 @media(min-width:1200px) {
   body:not(.pip) { padding-inline:32px; }
 }
