@@ -227,8 +227,8 @@ include offsets. The existing aggregator groups the events by Beijing date.
 
 The adapter checks the Herdr team Pi session directory and the standalone Pi
 directory under the configured home. Pi fork and copy events share their original
-identity. Host turns require the recorded Pi driver kind and use a separate event
-identity. The host Pi RPC driver runs without a native session log. Unknown
+identity. Host turns require the recorded `piAgent` driver kind and use a
+separate event identity. The host Pi RPC driver runs without a native session log. Unknown
 repository attribution stays unclassified. Missing counters or unreadable
 records stay visible in coverage.
 

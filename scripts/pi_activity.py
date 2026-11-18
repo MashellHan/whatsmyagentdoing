@@ -260,7 +260,7 @@ def collect_pi(home, repositories, start, end):
         source = "pi-host"
         try:
             for row in _rows(path, lambda code: reject(source, code)):
-                if row.get("driverKind") != "pi":
+                if row.get("driverKind") != "piAgent":
                     continue
                 date = _instant(row.get("at"))
                 if date is None:

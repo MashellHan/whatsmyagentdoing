@@ -79,7 +79,7 @@ class PiActivity(unittest.TestCase):
 
     def test_booked_host_turns_use_driver_identity_and_are_independent(self):
         self.session("team", SESSION, self.personal, [message()])
-        base = {"driverKind": "pi", "at": T1, "input": 104, "cachedInput": 90, "output": 6,
+        base = {"driverKind": "piAgent", "at": T1, "input": 104, "cachedInput": 90, "output": 6,
                 "model": "fixture-model", "botId": "fixture-bot", "threadId": "fixture-thread", "turnId": "fixture-turn"}
         retry = {**base, "at": "2026-02-01T16:00:01.000Z"}
         write(self.home / ".openmausbot/usage/2026-02.jsonl", [base, retry, {**base, "driverKind": "codex"},
@@ -95,6 +95,22 @@ class PiActivity(unittest.TestCase):
         self.assertIsNone(host[1]["cacheRead"])
         self.assertEqual(host[1]["output"], 6)
         self.assertIn({"source": "pi-host", "code": "IncompleteUsage"}, result["errors"])
+
+    def test_host_registry_kind_is_not_the_instance_or_model_label(self):
+        base = {"driverKind": "piAgent", "instanceId": "fixture-pi-instance", "at": T1,
+                "input": 5310, "cachedInput": 4700, "output": 161, "usageStatus": "complete",
+                "model": "fixture-model", "botId": "fixture-bot", "threadId": "fixture-thread", "turnId": "fixture-turn"}
+        write(self.home / ".openmausbot/usage/2026-02.jsonl", [
+            base,
+            {**base, "driverKind": "codex", "instanceId": "piAgent", "model": "piAgent", "turnId": "fixture-codex"},
+            {**base, "driverKind": "pi", "model": "fixture-unsupported", "turnId": "fixture-unsupported-kind"},
+        ])
+        result = PI.collect_pi(self.home, self.repos, START, END)
+        self.assertEqual(result["errors"], [])
+        self.assertEqual(len(result["tokens"]), 1)
+        event = result["tokens"][0]
+        self.assertEqual(event["model"], "fixture-model")
+        self.assertEqual((event["input"] + event["output"], event["cacheRead"]), (771, 4700))
 
     def test_incomplete_files_and_conflicting_replay_report_coverage(self):
         p = self.session("team", SESSION, self.personal, [message()])
