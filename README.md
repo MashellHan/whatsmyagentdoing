@@ -215,6 +215,37 @@ that aren't addressed to localhost. No runtime dependencies — read `src/` in f
 - Gemini CLI writes its thoughts together with the reply, so between your prompt and its first tool call or reply it simply shows "Thinking".
 - The log formats aren't public APIs. If an update changes them, statuses may degrade — please open an issue.
 
+## Pi activity input for local usage collection
+
+`scripts/pi_activity.py` combines retained Pi session usage and OpenMausBot
+usage ledger records into the local activity collector's existing machine
+sample. Call `augment_pi_usage(sample, home, repositories, start, end)` after
+reading local sources and before writing the machine sample or aggregating days.
+The sample has `tokens`, `errors`, `logFiles`, and `status` fields.
+The repository list supplies verified path and category pairs. Timestamps must
+include offsets. The existing aggregator groups the events by Beijing date.
+
+The adapter checks the Herdr team Pi session directory and the standalone Pi
+directory under the configured home. Pi fork and copy events share their original
+identity. Host turns require the recorded Pi driver kind and use a separate event
+identity. The host Pi RPC driver runs without a native session log. Unknown
+repository attribution stays unclassified. Missing counters or unreadable
+records stay visible in coverage.
+
+The same caller can be reproduced against a fresh synthetic machine sample
+without starting the scheduled collector:
+
+```sh
+python3 -B tests/pi-activity.py
+python3 -B scripts/pi_activity.py --home "$fixture_dir/home" \
+  --start 2026-02-01T00:00:00+08:00 --end 2026-02-03T00:00:00+08:00 \
+  --repositories "$fixture_dir/repos.json" --sample "$fixture_dir/sample.json" \
+  --output "$fixture_dir/augmented.json"
+```
+
+The output is a private machine sample and contains local event identities.
+The adapter emits no conversation content and has no publishing or network step.
+
 ## Development checks
 
 `npm run test:watcher` runs isolated filesystem regression checks for session discovery, resumed old chats, the hours window, unreadable paths and large logs. It requires Node.js 18+ and never reads your real agent history.
